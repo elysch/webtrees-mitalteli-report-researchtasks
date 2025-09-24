@@ -1,0 +1,1200 @@
+<?php
+
+/**
+ * webtrees: online genealogy
+ * Copyright (C) 2025 webtrees development team
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU General Public License for more details.
+ * You should have received a copy of the GNU General Public License
+ * along with this program. If not, see <https://www.gnu.org/licenses/>.
+ */
+
+declare(strict_types=1);
+
+namespace vendor\WebtreesModules\mitalteli\ResearchTasksReportNamespace\Report;
+
+use Fisharebest\Webtrees\Report\ReportParserGenerate;
+use Fisharebest\Webtrees\Report\AbstractRenderer;
+
+use VERSION;
+
+use DomainException;
+use Fisharebest\Webtrees\Auth;
+use Fisharebest\Webtrees\Date;
+use Fisharebest\Webtrees\DB;
+use Fisharebest\Webtrees\Elements\UnknownElement;
+use Fisharebest\Webtrees\Factories\MarkdownFactory;
+use Fisharebest\Webtrees\Family;
+use Fisharebest\Webtrees\Gedcom;
+use Fisharebest\Webtrees\GedcomRecord;
+use Fisharebest\Webtrees\I18N;
+use Fisharebest\Webtrees\Individual;
+use Fisharebest\Webtrees\Place;
+use Fisharebest\Webtrees\Registry;
+use Fisharebest\Webtrees\Tree;
+use Illuminate\Database\Query\Builder;
+use Illuminate\Database\Query\JoinClause;
+use Illuminate\Support\Str;
+use League\Flysystem\FilesystemOperator;
+use Symfony\Component\Cache\Adapter\NullAdapter;
+use Symfony\Component\ExpressionLanguage\ExpressionLanguage;
+
+use function addcslashes;
+use function array_pop;
+use function count;
+use function end;
+use function explode;
+use function in_array;
+use function method_exists;
+use function preg_match;
+use function preg_match_all;
+use function preg_replace;
+use function preg_split;
+use function str_contains;
+use function str_replace;
+use function str_starts_with;
+use function strip_tags;
+use function strlen;
+use function strpos;
+use function substr;
+use function trim;
+use function uasort;
+use function xml_get_current_line_number;
+
+use const PREG_SET_ORDER;
+ 
+/**
+ * Class MitalteliReportParserGenerate - parse a report.xml file and generate the report.
+ */
+class MitalteliReportParserGenerate extends ReportParserGenerate
+{
+
+    // Fisharebest\Webtrees\Report\ReportParserGenerate
+    private $parent_reflection_class;
+
+    private $tag_url;
+
+    public function getFromParentPrivatePropertyWithReflection(string $attribute_name) {
+        $property = $this->parent_reflection_class->getProperty($attribute_name);
+        $property->setAccessible(true); // Make the private property accessible
+        return $property->getValue($this); // Get the value from the parent object instance
+    }
+
+    public function setToParentPrivatePropertyWithReflection(string $attribute_name, $value) {
+        $property = $this->parent_reflection_class->getProperty($attribute_name);
+        $property->setAccessible(true);
+        $property->setValue($this, $value); // Set the value on the parent object instance
+    }
+
+    public function callFromParentPrivateMethodWithReflection($methodName)
+    {
+        if (!method_exists($this, $methodName)) {
+            throw new \ReflectionException("Method {$methodName} does not exist in parent object.");
+        }
+        $reflectionMethod = $this->parent_reflection_class->getMethod($methodName);
+        $reflectionMethod->setAccessible(true);
+
+        $params = array_slice(func_get_args(), 1); //get all the parameters after $methodName
+        return $reflectionMethod->invokeArgs($this, $params);
+    }
+
+    /**
+     * Create a parser for a report
+     *
+     * @param string               $report The XML filename
+     * @param AbstractRenderer     $report_root
+     * @param array<array<string>> $vars
+     * @param Tree                 $tree
+     */
+    public function __construct(string $report, AbstractRenderer $report_root, array $vars, Tree $tree)
+    {
+        if (is_null($report_root)) {
+            echo "report_root: " . print_r($report_root, true) . "\n\n";
+            echo "vars: " . print_r($vars, true) . "\n\n";
+
+            echo (new \ReflectionClass($this))->getShortName() . "-" . __FUNCTION__ . ", debug_print_backtrace():\n\n";
+            die(debug_print_backtrace());
+        }
+
+        $this_reflection_class = new \ReflectionClass('\vendor\WebtreesModules\mitalteli\ResearchTasksReportNamespace\Report\MitalteliReportParserGenerate');
+        $this->parent_reflection_class = $this_reflection_class->getParentClass();
+                
+        parent::{__FUNCTION__}($report, $report_root, $vars, $tree);
+    }
+
+    /**
+     * Handle <url>
+     *
+     * @return void
+     */
+    protected function urlStartHandler(array $attrs): void
+    {
+        if (empty($attrs['url'])) {
+            $parser_parent = $this->getFromParentPrivatePropertyWithReflection('parser');
+            throw new DomainException('REPORT ERROR url: The attribute "url=" is missing, not set or empty in the XML file for tag url on line: ' . xml_get_current_line_number($parser_parent));
+        }
+
+        $this->tag_url = $attrs['url'];
+    }
+
+    /**
+     * Handle </url>
+     *
+     * @return void
+     */
+    protected function urlEndHandler(): void
+    {
+        if (empty($this->tag_url)) {
+            $parser_parent = $this->getFromParentPrivatePropertyWithReflection('parser');
+            throw new DomainException('REPORT ERROR /url: The attribute "url=" is missing, not set or empty in the XML file for tag url when closing on line: ' . xml_get_current_line_number($parser_parent));
+        }
+
+        if (!empty($this->getFromParentPrivatePropertyWithReflection('current_element')->getValue())) {
+            $text = '<a href="'.$this->tag_url.'">' . 
+                $this->getFromParentPrivatePropertyWithReflection('current_element')->getValue() .
+                '</a>';
+
+            $this->getFromParentPrivatePropertyWithReflection('current_element')->setText($text);
+        }
+        $this->tag_url = '';
+    }
+
+    /**
+     * Handle <getPersonName />
+     * Get the name
+     * 1. id is empty - current GEDCOM record
+     * 2. id is set with a record id
+     *
+     * @param array<string> $attrs an array of key value pairs for the attributes
+     *
+     * @return void
+     */
+    protected function getPersonNameStartHandler(array $attrs): void
+    {
+        $id    = '';
+        $match = [];
+        if (empty($attrs['id'])) {
+            if (preg_match('/0 @(.+)@/', $this->getFromParentPrivatePropertyWithReflection('gedrec'), $match)) {
+                $id = $match[1];
+            }
+        } elseif (preg_match('/\$(.+)/', $attrs['id'], $match)) {
+            $vars_parent = $this->getFromParentPrivatePropertyWithReflection('vars');
+            if (isset($vars_parent[$match[1]]['id'])) {
+                $id = $vars_parent[$match[1]]['id'];
+            }
+        } elseif (preg_match('/@(.+)/', $attrs['id'], $match)) {
+            $gmatch = [];
+            if (preg_match("/\d $match[1] @([^@]+)@/", $this->getFromParentPrivatePropertyWithReflection('gedrec'), $gmatch)) {
+                $id = $gmatch[1];
+            }
+        } else {
+            $id = $attrs['id'];
+        }
+        if (!empty($id)) {
+            $setvarname = "";;
+            if (isset($attrs['setvar'])) {
+                $setvarname = $attrs['setvar'];
+            }
+            unset($setvarappend);
+            if (isset($attrs['varappend'])) {
+                $setvarappend = $attrs['varappend'];
+            }
+
+            $record = Registry::gedcomRecordFactory()->make($id, $this->getFromParentPrivatePropertyWithReflection('tree'));
+            if ($record === null) {
+                return;
+            }
+            if (!$record->canShowName()) {
+                if (empty($setvarname)) {
+                    $this->getFromParentPrivatePropertyWithReflection('current_element')->addText(I18N::translate('Private'));
+                } else {
+                    $vars_parent = $this->getFromParentPrivatePropertyWithReflection('vars');
+                    if (isset($setvarappend)) {
+                        $vars_parent[$setvarname]['id'] = $vars_parent[$setvarname]['id'] . $setvarappend . I18N::translate('Private');
+                    } else {
+                        $vars_parent[$setvarname]['id'] = I18N::translate('Private');
+                    }
+                    $this->setToParentPrivatePropertyWithReflection('vars', $vars_parent);
+                }
+            } else {
+                $name = $record->fullName();
+                $name = strip_tags($name);
+                if (!empty($attrs['truncate'])) {
+                    $name = Str::limit($name, (int) $attrs['truncate'], I18N::translate('…'));
+                } else {
+                    $addname = (string) $record->alternateName();
+                    $addname = strip_tags($addname);
+                    if (!empty($addname)) {
+                        $name .= ' ' . $addname;
+                    }
+                }
+                if (empty($setvarname)) {
+                    $this->getFromParentPrivatePropertyWithReflection('current_element')->addText(trim($name));
+                } else {
+                    $vars_parent = $this->getFromParentPrivatePropertyWithReflection('vars');
+                    if (isset($setvarappend)) {
+                        $vars_parent[$setvarname]['id'] = $vars_parent[$setvarname]['id'] . $setvarappend . trim($name);
+                    } else {
+                        $vars_parent[$setvarname]['id'] = trim($name);
+                    }
+                    $this->setToParentPrivatePropertyWithReflection('vars', $vars_parent);
+                }
+            }
+        }
+    }
+
+    /**
+     * Handle <getAllPersonNames />
+     * Get all the names
+     * 1. id is empty - current GEDCOM record
+     * 2. id is set with a record id
+     *
+     * @param array<string> $attrs an array of key value pairs for the attributes
+     *
+     * @return void
+     */
+    protected function getAllPersonNamesStartHandler(array $attrs): void
+    {
+        $id    = '';
+        $match = [];
+        if (empty($attrs['id'])) {
+            if (preg_match('/0 @(.+)@/', $this->getFromParentPrivatePropertyWithReflection('gedrec'), $match)) {
+                $id = $match[1];
+            }
+        } elseif (preg_match('/\$(.+)/', $attrs['id'], $match)) {
+            $vars_parent = $this->getFromParentPrivatePropertyWithReflection('vars');
+            if (isset($vars_parent[$match[1]]['id'])) {
+                $id = $vars_parent[$match[1]]['id'];
+            }
+        } elseif (preg_match('/@(.+)/', $attrs['id'], $match)) {
+            $gmatch = [];
+            if (preg_match("/\d $match[1] @([^@]+)@/", $this->getFromParentPrivatePropertyWithReflection('gedrec'), $gmatch)) {
+                $id = $gmatch[1];
+            }
+        } else {
+            $id = $attrs['id'];
+        }
+        if (!empty($id)) {
+            $setvarname = "";;
+            if (isset($attrs['setvar'])) {
+                $setvarname = $attrs['setvar'];
+            }
+            unset($setvarappend);
+            if (isset($attrs['varappend'])) {
+                $setvarappend = $attrs['varappend'];
+            }
+            #$separator = "<br />";
+            $separator = "\n";
+            if (!empty($attrs['separator'])) {
+                $separator = $attrs['separator'];
+            }
+
+            $record = Registry::gedcomRecordFactory()->make($id, $this->getFromParentPrivatePropertyWithReflection('tree'));
+            if ($record === null) {
+                return;
+            }
+            if (!$record->canShowName()) {
+                if (empty($setvarname)) {
+                    $this->getFromParentPrivatePropertyWithReflection('current_element')->addText(I18N::translate('Private'));
+                } else {
+                    $vars_parent = $this->getFromParentPrivatePropertyWithReflection('vars');
+                    if (isset($setvarappend)) {
+                        $vars_parent[$setvarname]['id'] = $vars_parent[$setvarname]['id'] . $setvarappend . I18N::translate('Private');
+                    } else {
+                        $vars_parent[$setvarname]['id'] = I18N::translate('Private');
+                    }
+                    $this->setToParentPrivatePropertyWithReflection('vars', $vars_parent);
+                }
+            } else {
+                $result = [];
+                $namesArray = $record->getAllNames();
+                foreach ($namesArray as $nameTmp) {
+                    $nameTmp = strip_tags($nameTmp['full']);
+                    if (!empty($attrs['truncate'])) {
+                        $nameTmp = Str::limit($nameTmp, (int) $attrs['truncate'], I18N::translate('…'));
+                    }
+                    $nameTmp = trim($nameTmp);
+                    if (!empty($nameTmp)) {
+                        array_push($result, trim($nameTmp));
+                    }
+                }
+                $names = implode($separator, $result);
+                if (empty($setvarname)) {
+                    $this->getFromParentPrivatePropertyWithReflection('current_element')->addText($names);
+                } else {
+                    $vars_parent = $this->getFromParentPrivatePropertyWithReflection('vars');
+                    if (isset($setvarappend)) {
+                        $vars_parent[$setvarname]['id'] = $vars_parent[$setvarname]['id'] . $setvarappend . $names;
+                    } else {
+                        $vars_parent[$setvarname]['id'] = $names;
+                    }
+                    $this->setToParentPrivatePropertyWithReflection('vars', $vars_parent);
+                }
+            }
+        }
+    }
+
+    /**
+     * Handle <gedcomValue />
+     *
+     * @param array<string> $attrs
+     *
+     * @return void
+     */
+    protected function gedcomValueStartHandler(array $attrs): void
+    {
+        $id    = '';
+        $match = [];
+        if (preg_match('/0 @(.+)@/', $this->getFromParentPrivatePropertyWithReflection('gedrec'), $match)) {
+            $id = $match[1];
+        }
+
+        if (isset($attrs['newline']) && $attrs['newline'] === '1') {
+            $useBreak = '1';
+        } else {
+            $useBreak = '0';
+        }
+
+        $tag = $attrs['tag'];
+        if (!empty($tag)) {
+            if ($tag === '@desc') {
+                $desc_parent = $this->getFromParentPrivatePropertyWithReflection('desc');
+                $value = trim($desc_parent);
+                $this->getFromParentPrivatePropertyWithReflection('current_element')->addText($value);
+            }
+            if ($tag === '@id') {
+                $this->getFromParentPrivatePropertyWithReflection('current_element')->addText($id);
+            } else {
+                $tag = str_replace('@fact', $this->getFromParentPrivatePropertyWithReflection('fact'), $tag);
+                if (empty($attrs['level'])) {
+                    $level = (int) explode(' ', trim($this->getFromParentPrivatePropertyWithReflection('gedrec')))[0];
+                    if ($level === 0) {
+                        $level++;
+                    }
+                } else {
+                    $level = (int) $attrs['level'];
+                }
+                $tags  = preg_split('/[: ]/', $tag);
+                $value = $this->callFromParentPrivateMethodWithReflection('getGedcomValue', $tag, $level, $this->getFromParentPrivatePropertyWithReflection('gedrec'));
+                switch (end($tags)) {
+                    case 'DATE':
+                        $tmp   = new Date($value);
+                        $dfmt = "%j %F %Y";
+                        if (!empty($attrs['truncate'])) {
+                            if ($attrs['truncate'] === "d") {
+                                $dfmt = "%j %M %Y";
+                            }
+                            if ($attrs['truncate'] === "Y") {
+                                $dfmt = "%Y";
+                            }
+                        }
+                        $value = strip_tags($tmp->display(null, $dfmt));
+                        break;
+                    case 'PLAC':
+                        $tmp   = new Place($value, $this->getFromParentPrivatePropertyWithReflection('tree'));
+                        $value = $tmp->shortName();
+                        break;
+                }
+                if ($useBreak === '1') {
+                    // Insert <br> when multiple dates exist.
+                    // This works around a TCPDF bug that incorrectly wraps RTL dates on LTR pages
+                    $value = str_replace('(', '<br>(', $value);
+                    $value = str_replace('<span dir="ltr"><br>', '<br><span dir="ltr">', $value);
+                    $value = str_replace('<span dir="rtl"><br>', '<br><span dir="rtl">', $value);
+                    if (substr($value, 0, 4) === '<br>') {
+                        $value = substr($value, 4);
+                    }
+                }
+                $tmp = explode(':', $tag);
+                if (in_array(end($tmp), ['NOTE', 'TEXT'], true)) {
+                    #MARKDOWN IN REPORTS PRODUCES UNPREDICTED RESULTS AND OFTEN IT DOESN'T LOOK OK
+                    #if ($this->tree->getPreference('FORMAT_TEXT') === 'markdown') {
+                    #    $value = strip_tags(Registry::markdownFactory()->markdown($value, $this->tree), ['br']);
+                    #    $value = strtr($value, [MarkdownFactory::BREAK => ' ']);
+                    #} else {
+                        $value = str_replace("\n", "<br>", $value);
+                        $xvalue = $value;
+                        $value = preg_replace("/#+ *([^<]*)/", "<b>$1</b>", $value);
+                        $value = preg_replace("/\*\*\*([^\*]*)\*\*\*/", "<b><em>$1</em></b>", $value);
+                        $value = preg_replace("/\*\*([^\*]*)\*\*/", "<b>$1</b>", $value);
+                        $value = preg_replace("/\*([^*]*)\*/", "<em>$1</em>", $value);
+                    #}
+                    $value = strtr($value, [MarkdownFactory::BREAK => ' ']);
+                }
+
+                if (!empty($attrs['truncate'])) {
+                    $value = strip_tags($value);
+                    if ((int) $attrs['truncate'] > 0) {
+                        $value = Str::limit($value, (int) $attrs['truncate'], I18N::translate('…'));
+                    }
+                }
+                $this->getFromParentPrivatePropertyWithReflection('current_element')->addText($value);
+            }
+        }
+    }
+
+    /**
+     * Variable lookup
+     * Retrieve predefined variables :
+     * @ desc GEDCOM fact description, example:
+     *        1 EVEN This is a description
+     * @ fact GEDCOM fact tag, such as BIRT, DEAT etc.
+     * $ I18N::translate('....')
+     * $ language_settings[]
+     *
+     * @param array<string> $attrs an array of key value pairs for the attributes
+     *
+     * @return void
+     */
+    protected function varStartHandler(array $attrs): void
+    {
+        if (!isset($attrs['var'])) {
+            $parser_parent = $this->getFromParentPrivatePropertyWithReflection('parser');
+            throw new DomainException('REPORT ERROR var: The attribute "var=" is missing or not set in the XML file on line: ' . xml_get_current_line_number($parser_parent));
+        }
+
+        $var = $attrs['var'];
+        // SetVar element preset variables
+        $vars_parent = $this->getFromParentPrivatePropertyWithReflection('vars');
+        if (!empty($vars_parent[$var]['id'])) {
+            $var = $vars_parent[$var]['id'];
+        } else {
+            $fact_parent = $this->getFromParentPrivatePropertyWithReflection('fact');
+            $type_parent = $this->getFromParentPrivatePropertyWithReflection('type');
+            $desc_parent = $this->getFromParentPrivatePropertyWithReflection('desc');
+
+            $tfact = $fact_parent;
+            if (($fact_parent === 'EVEN' || $fact_parent === 'FACT') && $type_parent !== '') {
+                // Use :
+                // n TYPE This text if string
+                $tfact = $type_parent;
+            } else {
+                foreach ([Individual::RECORD_TYPE, Family::RECORD_TYPE] as $record_type) {
+                    $element = Registry::elementFactory()->make($record_type . ':' . $fact_parent);
+
+                    if (!$element instanceof UnknownElement) {
+                        $tfact = $element->label();
+                        break;
+                    }
+                }
+            }
+
+            $var = strtr($var, ['@desc' => $desc_parent, '@fact' => $tfact]);
+
+            if (preg_match('/^I18N::number\((.+)\)$/', $var, $match)) {
+                $var = I18N::number((int) $match[1]);
+            } elseif (preg_match('/^I18N::translate\(\'(.+)\'\)$/', $var, $match)) {
+                $var = I18N::translate($match[1]);
+            } elseif (preg_match('/^I18N::translateContext\(\'(.+)\', *\'(.+)\'\)$/', $var, $match)) {
+                $var = I18N::translateContext($match[1], $match[2]);
+            }
+        }
+        // Check if variable is set as a date and reformat the date
+        if (isset($attrs['date'])) {
+            if ($attrs['date'] === '1') {
+                $g   = new Date($var);
+                $var = $g->display();
+            }
+        }
+        $this->getFromParentPrivatePropertyWithReflection('current_element')->addText($var);
+        $this->text = $var; // Used for title/descriptio
+    }
+
+    /**
+     * Setting upp or changing variables in the XML
+     * The XML variable name and value is stored in $this->vars
+     *
+     * @param array<string> $attrs an array of key value pairs for the attributes
+     *
+     * @return void
+     */
+    protected function setVarStartHandler(array $attrs): void
+    {
+        if (empty($attrs['name'])) {
+            throw new DomainException('REPORT ERROR var: The attribute "name" is missing or not set in the XML file');
+        }
+
+        $name  = $attrs['name'];
+        $value = $attrs['value'];
+        $match = [];
+        // Current GEDCOM record strings
+        if ($value === '@ID') {
+            if (preg_match('/0 @(.+)@/', $this->getFromParentPrivatePropertyWithReflection('gedrec'), $match)) {
+                $value = $match[1];
+            }
+        } elseif ($value === '@fact') {
+            $value = $this->getFromParentPrivatePropertyWithReflection('fact');
+        } elseif ($value === '@desc') {
+            $value = $this->getFromParentPrivatePropertyWithReflection('desc');
+        } elseif ($value === '@generation') {
+            $value = (string) $this->getFromParentPrivatePropertyWithReflection('generation');
+        } elseif ($value === '@base_url') {
+            $value = "";
+            if (array_key_exists("REQUEST_URI", $_SERVER)) {
+                $value = filter_var(urldecode($_SERVER["REQUEST_URI"]), FILTER_SANITIZE_URL);
+            }
+            $url1 = "";
+            $i = strpos($value, "route=");
+            if ($i !== false) { // url-rewrite not active
+                $url1 = substr($value, 0, $i + 6);
+                $value = substr($value, $i + 6);
+            }
+            $i = strpos($value, "/report");
+            if ($i !== false) {
+                $value = substr($value, 0, $i);
+            }
+            $value = $url1 . $value;
+        } elseif (preg_match("/@(\w+)/", $value, $match)) {
+            $gmatch = [];
+            if (preg_match("/\d $match[1] (.+)/", $this->getFromParentPrivatePropertyWithReflection('gedrec'), $gmatch)) { 
+                $value = str_replace('@', '', trim($gmatch[1]));
+            }
+        }
+        if (preg_match("/\\$(\w+)/", $name, $match)) {
+            $vars_parent = $this->getFromParentPrivatePropertyWithReflection('vars');
+            $name = $vars_parent["'" . $match[1] . "'"]['id'];
+        }
+        $count = preg_match_all("/\\$(\w+)/", $value, $match, PREG_SET_ORDER);
+        $i     = 0;
+        while ($i < $count) {
+            $vars_parent = $this->getFromParentPrivatePropertyWithReflection('vars');
+            $t     = $vars_parent[$match[$i][1]]['id'];
+            $value = preg_replace('/\$' . $match[$i][1] . '/', $t, $value, 1);
+            $i++;
+        }
+        if (preg_match('/^I18N::number\((.+)\)$/', $value, $match)) {
+            $value = I18N::number((int) $match[1]);
+        } elseif (preg_match('/^I18N::translate\(\'(.+)\'\)$/', $value, $match)) {
+            $value = I18N::translate($match[1]);
+        } elseif (preg_match('/^I18N::translateContext\(\'(.+)\', *\'(.+)\'\)$/', $value, $match)) {
+            $value = I18N::translateContext($match[1], $match[2]);
+        }
+
+        // Arithmetic functions
+        if (preg_match("/(\d+)\s*([-+*\/])\s*(\d+)/", $value, $match)) {
+            // Create an expression language with the functions used by our reports.
+            $expression_provider  = new \Fisharebest\Webtrees\Report\ReportExpressionLanguageProvider();
+            $expression_cache     = new NullAdapter();
+            $expression_language  = new ExpressionLanguage($expression_cache, [$expression_provider]);
+
+            $value = (string) $expression_language->evaluate($value);
+        }
+
+        if (str_contains($value, '@')) {
+            $value = '';
+        }
+        $vars_parent = $this->getFromParentPrivatePropertyWithReflection('vars');
+        $vars_parent[$name]['id'] = $value;
+        $this->setToParentPrivatePropertyWithReflection('vars', $vars_parent);
+    }
+
+    /**
+     * Handle <list>
+     *
+     * THE FILTERS MUST HAVE atleast one space (\s regex) to separate expression from the rest.
+     * "SOMEFACT='something'" or "SOMEFACT=$variable" won't work, should be specified like this:
+     * "SOMEFACT = 'something'" or "SOMEFACT = $variable"
+     *
+     * @param array<string> $attrs
+     *
+     * @return void
+     */
+    protected function listStartHandler(array $attrs): void
+    {
+
+        /////////////////////////////////////////////////////////////////////////////////////////////////////////
+        //                                                                                                     //
+        // TODO REMOVE ENTRIES THAT DO NOT MATCH SELECTED PARAMETERS AND WERE INCLUDED IN THE SQL RESULT       // !ESL
+        //      In a _TODO report, when you try to filter for an entry with sertain text, other results        //
+        //      appear in the sql result because many gedcom entries are stored in the same database field.    //
+        //      The filter text can be found in another fact or event since the LIKE database operator takes   //
+        //      the whole field.                                                                               //
+        //      It could also happen that an entry is removed when it shouldnt be because of the order of the  //
+        //      facts.                                                                                         //
+        //                                                                                                     //
+        //      One partial solution could be to add the filter to the <RepeatTag> tag (repeatTagStartHandler) //
+        //      Another soluction could be to use a regular expression in the sql where clause, if possible.   //
+        //                                                                                                     //
+        // TODO SORT THE ENTRIES THAT CAN'T BE SORTED USING SQL.                                               // !ESL
+        //      Since many gedcom entries are stored in the same database field, in a _TODO report is          //
+        //      not possible to sort entries correctly (AFAICT) since the list is by GedcomRecord and not      //
+        //      by fact. A GedcomRecord can have more than one _TODO fact.                                     //
+        //                                                                                                     //
+        //       ********************************************************************************************  //
+        //       *** NOTE: Since the list is based on individuals or families (GedcomRecord), can't apply ***  //
+        //       ***       filters per fact or per fact attribute.                                        ***  //
+        //       ***                                                                                      ***  //
+        //       ***       The printed row filters must be applied in a different way                     ***  //
+        //       ********************************************************************************************  //
+        //                                                                                                     //
+        /////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+        $this->setToParentPrivatePropertyWithReflection('process_repeats', $this->getFromParentPrivatePropertyWithReflection('process_repeats')+1);
+        if ($this->getFromParentPrivatePropertyWithReflection('process_repeats') > 1) {
+            return;
+        }
+
+        $match = [];
+        if (isset($attrs['sortby'])) {
+            $sortby = $attrs['sortby'];
+            if (preg_match("/\\$(\w+)/", $sortby, $match)) {
+                $vars_parent = $this->getFromParentPrivatePropertyWithReflection('vars');
+                $sortby = $vars_parent[$match[1]]['id'];
+                $sortby = trim($sortby);
+            }
+        } else {
+            $sortby = 'NAME';
+        }
+
+        $listname = $attrs['list'] ?? 'individual';
+
+        // Some filters/sorts can be applied using SQL, while others require PHP
+        switch ($listname) {
+            case 'pending':
+                if (version_compare(PHP_VERSION, '8.0.0', '>=')) {
+                    require_once 'MitalteliReportParserGenerate-listStartHandler-pending-8.php';
+                } else {
+                    require_once 'MitalteliReportParserGenerate-listStartHandler-pending-7.php';
+                }
+                break;
+
+            case 'individual':
+                $query = DB::table('individuals')
+                    ->where('i_file', '=', $this->getFromParentPrivatePropertyWithReflection('tree')->id())
+                    ->select(['i_id AS xref', 'i_gedcom AS gedcom'])
+                    ->distinct();
+
+                foreach ($attrs as $attr => $value) {
+                    if (str_starts_with($attr, 'filter') && $value !== '') {
+                        // Substitute any variables in the filter value
+                        $value = $this->callFromParentPrivateMethodWithReflection('substituteVars', $value, false);
+                        // Convert the various filters into SQL
+                        if (preg_match('/^(\w+):DATE (LTE|GTE) (.+)$/', $value, $match)) {
+                            $query->join('dates AS ' . $attr, static function (JoinClause $join) use ($attr): void {
+                                $join
+                                    ->on($attr . '.d_gid', '=', 'i_id')
+                                    ->on($attr . '.d_file', '=', 'i_file');
+                            });
+
+                            $query->where($attr . '.d_fact', '=', $match[1]);
+
+                            $date = new Date($match[3]);
+
+                            if ($match[2] === 'LTE') {
+                                $query->where($attr . '.d_julianday2', '<=', $date->maximumJulianDay());
+                            } else {
+                                $query->where($attr . '.d_julianday1', '>=', $date->minimumJulianDay());
+                            }
+
+                            // This filter has been fully processed
+                            unset($attrs[$attr]);
+                        } elseif (preg_match('/^NAME CONTAINS (.+)$/', $value, $match)) {
+                            $query->join('name AS ' . $attr, static function (JoinClause $join) use ($attr): void {
+                                $join
+                                    ->on($attr . '.n_id', '=', 'i_id')
+                                    ->on($attr . '.n_file', '=', 'i_file');
+                            });
+                            // Search the DB only if there is any name supplied
+                            $names = explode(' ', $match[1]);
+                            foreach ($names as $name) {
+                                $query->where($attr . '.n_full', 'LIKE', '%' . addcslashes($name, '\\%_') . '%');
+                            }
+
+                            // This filter has been fully processed
+                            unset($attrs[$attr]);
+                        } elseif (preg_match('/^XREF\s*EQ\s*([^\s]+)\s*$/', $value, $match)) {
+                            if (!empty($match[1])) {
+                                $query->where('i_id', '=', $match[1]);
+                            }
+
+                            // This filter has been fully processed
+                            unset($attrs[$attr]);
+                        } elseif (preg_match('/^LIKE \/(.+)\/$/', $value, $match)) {
+                            // Convert newline escape sequences to actual new lines
+                            $match[1] = str_replace('\n', "\n", $match[1]);
+
+                            $query->where('i_gedcom', 'LIKE', $match[1]);
+
+                            // This filter has been fully processed
+                            unset($attrs[$attr]);
+                        } elseif (preg_match('/^(?:\w*):PLAC CONTAINS (.+)$/', $value, $match)) {
+                            // Don't unset this filter. This is just initial filtering for performance
+                            $query
+                                ->join('placelinks AS ' . $attr . 'a', static function (JoinClause $join) use ($attr): void {
+                                    $join
+                                        ->on($attr . 'a.pl_file', '=', 'i_file')
+                                        ->on($attr . 'a.pl_gid', '=', 'i_id');
+                                })
+                                ->join('places AS ' . $attr . 'b', static function (JoinClause $join) use ($attr): void {
+                                    $join
+                                        ->on($attr . 'b.p_file', '=', $attr . 'a.pl_file')
+                                        ->on($attr . 'b.p_id', '=', $attr . 'a.pl_p_id');
+                                })
+                                ->where($attr . 'b.p_place', 'LIKE', '%' . addcslashes($match[1], '\\%_') . '%');
+                        } elseif (preg_match('/^(\w*):(\w+) CONTAINS (.+)$/', $value, $match)) {
+                            // Don't unset this filter. This is just initial filtering for performance
+                            $match[3] = strtr($match[3], ['\\' => '\\\\', '%'  => '\\%', '_'  => '\\_', ' ' => '%']);
+                            $like = "%\n1 " . $match[1] . "%\n2 " . $match[2] . '%' . $match[3] . '%';
+                            $query->where('i_gedcom', 'LIKE', $like);
+                        } elseif (preg_match('/^(\w+) CONTAINS (.*)$/', $value, $match)) {
+                            // Don't unset this filter. This is just initial filtering for performance
+                            $match[2] = strtr($match[2], ['\\' => '\\\\', '%'  => '\\%', '_'  => '\\_', ' ' => '%']);
+                            $like = "%\n1 " . $match[1] . '%' . $match[2] . '%';
+                            $query->where('i_gedcom', 'LIKE', $like);
+                        }
+                    }
+                }
+
+                ##!ESL
+                #$query_str_tmp = vsprintf(str_replace('?', '%s', $query->toSql()), collect($query->getBindings())->map(function ($binding) {
+                #    return is_numeric($binding) ? $binding : "'{$binding}'";
+                #    })->toArray());
+                #error_log("# QUERY INDIVIDUAL ini #: [" . print_r($query_str_tmp, true) . "] :# QUERY INDIVIDUAL fin #");
+                ##die("<pre>". print_r($query_str_tmp, true) ."</pre>");
+                ##die("<pre>". print_r($query->getBindings(), true) ."</pre>");
+
+                $this->setToParentPrivatePropertyWithReflection('list', []);
+
+                foreach ($query->get() as $row) {
+                    $list = $this->getFromParentPrivatePropertyWithReflection('list');
+                    $row_tmp = Registry::individualFactory()->make($row->xref, $this->getFromParentPrivatePropertyWithReflection('tree'), $row->gedcom);
+                    $list[$row->xref] = $row_tmp;
+                    $this->setToParentPrivatePropertyWithReflection('list', $list);
+                }
+                break;
+
+            case 'family':
+                $query = DB::table('families')
+                    ->where('f_file', '=', $this->getFromParentPrivatePropertyWithReflection('tree')->id())
+                    ->select(['f_id AS xref', 'f_gedcom AS gedcom'])
+                    ->distinct();
+
+                foreach ($attrs as $attr => $value) {
+                    if (str_starts_with($attr, 'filter') && $value !== '') {
+                        // Substitute any variables in the filter value
+                        $value = $this->callFromParentPrivateMethodWithReflection('substituteVars', $value, false);
+                        // Convert the various filters into SQL
+                        if (preg_match('/^(\w+):DATE (LTE|GTE) (.+)$/', $value, $match)) {
+                            $query->join('dates AS ' . $attr, static function (JoinClause $join) use ($attr): void {
+                                $join
+                                    ->on($attr . '.d_gid', '=', 'f_id')
+                                    ->on($attr . '.d_file', '=', 'f_file');
+                            });
+
+                            $query->where($attr . '.d_fact', '=', $match[1]);
+
+                            $date = new Date($match[3]);
+
+                            if ($match[2] === 'LTE') {
+                                $query->where($attr . '.d_julianday2', '<=', $date->maximumJulianDay());
+                            } else {
+                                $query->where($attr . '.d_julianday1', '>=', $date->minimumJulianDay());
+                            }
+
+                            // This filter has been fully processed
+                            unset($attrs[$attr]);
+                        } elseif (preg_match('/^LIKE \/(.+)\/$/', $value, $match)) {
+                            // Convert newline escape sequences to actual new lines
+                            $match[1] = str_replace('\n', "\n", $match[1]);
+
+                            $query->where('f_gedcom', 'LIKE', $match[1]);
+
+                            // This filter has been fully processed
+                            unset($attrs[$attr]);
+                        } elseif (preg_match('/^NAME CONTAINS (.*)$/', $value, $match)) {
+                            if ($sortby === 'NAME' || $match[1] !== '') {
+                                $query->join('name AS ' . $attr, static function (JoinClause $join) use ($attr): void {
+                                    $join
+                                        ->on($attr . '.n_file', '=', 'f_file')
+                                        ->where(static function (Builder $query): void {
+                                            $query
+                                                ->whereColumn('n_id', '=', 'f_husb')
+                                                ->orWhereColumn('n_id', '=', 'f_wife');
+                                        });
+                                });
+                                // Search the DB only if there is any name supplied
+                                if ($match[1] != '') {
+                                    $names = explode(' ', $match[1]);
+                                    foreach ($names as $name) {
+                                        $query->where($attr . '.n_full', 'LIKE', '%' . addcslashes($name, '\\%_') . '%');
+                                    }
+                                }
+                            }
+
+                            // This filter has been fully processed
+                            unset($attrs[$attr]);
+                        } elseif (preg_match('/^(?:\w*):PLAC CONTAINS (.+)$/', $value, $match)) {
+                            // Don't unset this filter. This is just initial filtering for performance
+                            $query
+                                ->join('placelinks AS ' . $attr . 'a', static function (JoinClause $join) use ($attr): void {
+                                    $join
+                                        ->on($attr . 'a.pl_file', '=', 'f_file')
+                                        ->on($attr . 'a.pl_gid', '=', 'f_id');
+                                })
+                                ->join('places AS ' . $attr . 'b', static function (JoinClause $join) use ($attr): void {
+                                    $join
+                                        ->on($attr . 'b.p_file', '=', $attr . 'a.pl_file')
+                                        ->on($attr . 'b.p_id', '=', $attr . 'a.pl_p_id');
+                                })
+                                ->where($attr . 'b.p_place', 'LIKE', '%' . addcslashes($match[1], '\\%_') . '%');
+                        } elseif (preg_match('/^(\w*):(\w+) CONTAINS (.+)$/', $value, $match)) {
+                            // Don't unset this filter. This is just initial filtering for performance
+                            $match[3] = strtr($match[3], ['\\' => '\\\\', '%'  => '\\%', '_'  => '\\_', ' ' => '%']);
+                            $like = "%\n1 " . $match[1] . "%\n2 " . $match[2] . '%' . $match[3] . '%';
+                            $query->where('f_gedcom', 'LIKE', $like);
+                        } elseif (preg_match('/^(\w+) CONTAINS (.+)$/', $value, $match)) {
+                            // Don't unset this filter. This is just initial filtering for performance
+                            $match[2] = strtr($match[2], ['\\' => '\\\\', '%'  => '\\%', '_'  => '\\_', ' ' => '%']);
+                            $like = "%\n1 " . $match[1] . '%' . $match[2] . '%';
+                            $query->where('f_gedcom', 'LIKE', $like);
+                        }
+                    }
+                }
+
+                ##!ESL
+                #$query_str_tmp = vsprintf(str_replace('?', '%s', $query->toSql()), collect($query->getBindings())->map(function ($binding) {
+                #    return is_numeric($binding) ? $binding : "'{$binding}'";
+                #    })->toArray());
+                #error_log("# QUERY INDIVIDUAL ini #: [" . print_r($query_str_tmp, true) . "] :# QUERY INDIVIDUAL fin #");
+                ##die("<pre>". print_r($query_str_tmp, true) ."</pre>");
+                ##die("<pre>". print_r($query->getBindings(), true) ."</pre>");
+
+                $this->setToParentPrivatePropertyWithReflection('list', []);
+
+                foreach ($query->get() as $row) {
+                    $list = $this->getFromParentPrivatePropertyWithReflection('list');
+                    $row_tmp = Registry::familyFactory()->make($row->xref, $this->getFromParentPrivatePropertyWithReflection('tree'), $row->gedcom);
+                    $list[$row->xref] = $row_tmp;
+                    $this->setToParentPrivatePropertyWithReflection('list', $list);
+                }
+                break;
+
+            default:
+                throw new DomainException('Invalid list name: ' . $listname);
+        }
+
+        $filters  = [];
+        $filters2 = [];
+        if (isset($attrs['filter1']) && count($this->getFromParentPrivatePropertyWithReflection('list')) > 0) {
+            foreach ($attrs as $key => $value) {
+                if (preg_match("/filter(\d)/", $key)) {
+                    $condition = $value;
+                    if (preg_match("/@(\w+)/", $condition, $match)) {
+                        $id    = $match[1];
+                        $value = "''";
+                        if ($id === 'ID') {
+                            if (preg_match('/0 @(.+)@/', $this->getFromParentPrivatePropertyWithReflection('gedrec'), $match)) {
+                                $value = "'" . $match[1] . "'";
+                            }
+                        } elseif ($id === 'fact') {
+                            $value = "'" . $this->getFromParentPrivatePropertyWithReflection('fact') . "'";
+                        } elseif ($id === 'desc') {
+                            $value = "'" . $this->getFromParentPrivatePropertyWithReflection('desc') . "'";
+                        } elseif (preg_match("/\d $id (.+)/", $this->getFromParentPrivatePropertyWithReflection('gedrec'), $match)) {
+                            $value = "'" . str_replace('@', '', trim($match[1])) . "'";
+                        }
+                        $condition = preg_replace("/@$id/", $value, $condition);
+                    }
+                    //-- handle regular expressions
+                    if (preg_match("/(?P<tag>" . Gedcom::REGEX_TAG . "(" . ":" . Gedcom::REGEX_TAG . ")*" . ")\s*(?P<expr>[^\s$]+)\s*(?P<val>.+)/", $condition, $match)) {
+                        $tag  = trim($match["tag"]);
+                        $expr = trim($match["expr"]);
+                        $val  = trim($match["val"]);
+                        if (preg_match("/\\$(\w+)/", $val, $match)) {
+                            $vars_parent = $this->getFromParentPrivatePropertyWithReflection('vars');
+                            $val = $vars_parent[$match[1]]['id'];
+                            $val = trim($val);
+                        }
+                        if ($val !== '') {
+                            $searchstr = '';
+                            $tags      = explode(':', $tag);
+                            //-- only limit to a level number if we are specifically looking at a level
+                            if (count($tags) > 1) {
+                                $level = 1;
+                                $t = 'XXXX';
+                                foreach ($tags as $t) {
+                                    if (!empty($searchstr)) {
+                                        $searchstr .= "[^\n]*(\n[2-9][^\n]*)*\n";
+                                    }
+                                    //-- search for both EMAIL and _EMAIL... silly double gedcom standard
+                                    if ($t === 'EMAIL' || $t === '_EMAIL') {
+                                        $t = '_?EMAIL';
+                                    }
+                                    $searchstr .= $level . ' ' . $t;
+                                    $level++;
+                                }
+                            } else {
+                                if ($tag === 'EMAIL' || $tag === '_EMAIL') {
+                                    $tag = '_?EMAIL';
+                                }
+                                $t         = $tag;
+                                $searchstr = '1 ' . $tag;
+                            }
+                            switch ($expr) {
+                                case 'CONTAINS':
+                                    if ($t === 'PLAC') {
+                                        $searchstr .= "[^\n]*[, ]*" . $val;
+                                    } else {
+                                        $searchstr .= "[^\n]*" . $val;
+                                    }
+                                    $filters[] = $searchstr;
+                                    break;
+                                default:
+                                    $filters2[] = [
+                                        'tag'  => $tag,
+                                        'expr' => $expr,
+                                        'val'  => $val,
+                                    ];
+                                    break;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        //-- apply other filters to the list that could not be added to the search string
+        if ($filters !== []) {
+            foreach ($this->getFromParentPrivatePropertyWithReflection('list') as $key => $record) {
+                foreach ($filters as $filter) {
+                    if (!preg_match('/' . $filter . '/i', $record->privatizeGedcom(Auth::accessLevel($this->getFromParentPrivatePropertyWithReflection('tree'))))) {
+                        $list_parent = $this->getFromParentPrivatePropertyWithReflection('list');
+                        unset($list_parent[$key]);
+                        $this->setToParentPrivatePropertyWithReflection('list', $list_parent);
+                        break;
+                    }
+                }
+            }
+        }
+        if ($filters2 !== []) {
+            $mylist = [];
+            foreach ($this->getFromParentPrivatePropertyWithReflection('list') as $indi) {
+                $key  = $indi->xref();
+                $grec = $indi->privatizeGedcom(Auth::accessLevel($this->getFromParentPrivatePropertyWithReflection('tree')));
+                $keep = true;
+                foreach ($filters2 as $filter) {
+                    if ($keep) {
+                        $tag  = $filter['tag'];
+                        $expr = $filter['expr'];
+                        $val  = $filter['val'];
+                        if ($val === "''") {
+                            $val = '';
+                        }
+                        $tags = explode(':', $tag);
+                        $t    = end($tags);
+                        $v    = $this->callFromParentPrivateMethodWithReflection('getGedcomValue', $tag, 1, $grec);
+                        //-- check for EMAIL and _EMAIL (silly double gedcom standard :P)
+                        if ($t === 'EMAIL' && empty($v)) {
+                            $tag  = str_replace('EMAIL', '_EMAIL', $tag);
+                            $tags = explode(':', $tag);
+                            $t    = end($tags);
+                            $v    = self::getSubRecord(1, $tag, $grec);
+                        }
+
+                        switch ($expr) {
+                            case 'GTE':
+                                if ($t === 'DATE') {
+                                    $date1 = new Date($v);
+                                    $date2 = new Date($val);
+                                    $keep  = (Date::compare($date1, $date2) >= 0);
+                                } elseif ($val >= $v) {
+                                    $keep = true;
+                                }
+                                break;
+                            case 'LTE':
+                                if ($t === 'DATE') {
+                                    $date1 = new Date($v);
+                                    $date2 = new Date($val);
+                                    $keep  = (Date::compare($date1, $date2) <= 0);
+                                } elseif ($val >= $v) {
+                                    $keep = true;
+                                }
+                                break;
+                            case 'NE':
+                                if ($v != $val) {
+                                    $keep = true;
+                                } else {
+                                    $keep = false;
+                                }
+                                break;
+                            default:
+                                if ($v == $val) {
+                                    $keep = true;
+                                } else {
+                                    $keep = false;
+                                }
+                                break;
+                        }
+                    }
+                }
+                if ($keep) {
+                    $mylist[$key] = $indi;
+                }
+            }
+            $this->setToParentPrivatePropertyWithReflection('list', $mylist);
+        }
+
+        $list_parent = $this->getFromParentPrivatePropertyWithReflection('list');
+        switch ($sortby) {
+            case 'NAME':
+                uasort($list_parent, GedcomRecord::nameComparator());
+                break;
+            case 'CHAN':
+                uasort($list_parent, GedcomRecord::lastChangeComparator());
+                break;
+            case 'BIRT:DATE':
+                uasort($list_parent, Individual::birthDateComparator());
+                break;
+            case 'DEAT:DATE':
+                uasort($list_parent, Individual::deathDateComparator());
+                break;
+            case 'MARR:DATE':
+                uasort($list_parent, Family::marriageDateComparator());
+                break;
+            case ( substr_compare($sortby, 'DATE', -strlen('DATE'))): # ends_with
+                # THIS SORTS ACORDING TO THE FIRST FACT EXISTING IN EACH GedcomRecord (Individual or Family or Pending)
+                # Empty dates go to the end
+
+                uasort($list_parent, static function (GedcomRecord $x, GedcomRecord $y) use ($sortby) : int {
+                    $date1 = null;
+                    $date2 = null;
+
+                    $tmpSortByStr = $sortby;
+                    if (substr_count($sortby, ':') > 0) {
+                        $tmpSortbyArr  = explode(':', $sortby);
+                        array_pop($tmpSortbyArr);
+                        $tmpSortByStr = implode(':', $tmpSortbyArr);
+
+                        $fact1 = $x->facts([$tmpSortByStr])->first();
+
+                        if (empty($fact1)) {
+                            return 1;
+                        } else {
+                            $date1 = $fact1->date();
+                        }
+
+                        $fact2 = $y->facts([$tmpSortByStr])->first();
+    
+                        if (empty($fact2)) {
+                            return -1;
+                        } else {
+                            $date2 = $fact2->date();
+                        }
+
+                    } else {
+                        #VALIDATE IF STILL WORKS IN THIS CASE
+                        $fact1 = $x->facts([])->first();
+                        $fact2 = $y->facts([])->first();
+                        $date1 = $fact1 ? $fact1->date() : null;
+                        $date2 = $fact2 ? $fact2->date() : null;
+                    }
+
+                    if (empty($date1) || ( ! $date1->isOK())) {
+                        return 1;
+                    }
+
+                    if (empty($date2) || ( ! $date2->isOK())) {
+                        return -1;
+                    }
+
+                    return (\Fisharebest\Webtrees\Date::compare($date1, $date2));
+                    }
+                );
+                break;
+            case '_TODO':
+            case '_TODO:NOTE':
+            case '_TODO:_WT_USER':
+
+                # THIS SORTS ACORDING TO THE FIRST FACT EXISTING IN EACH GedcomRecord (Individual or Family or Pending)
+                # Empty strings go to the end
+
+                #TODO Handle INDI:_TODO... and FAM:_TODO...
+
+                uasort($list_parent, static function (GedcomRecord $x, GedcomRecord $y) use ($sortby) : int {
+                    $string1 = "";
+                    $string2 = "";
+
+                    $tmpSortByStr = $sortby;
+                    if (substr_count($sortby, ':') > 0) { #Fact with attributes
+                        $tmpSortbyArr  = explode(':', $sortby);
+                        $attribute = array_pop($tmpSortbyArr);
+                        $tmpSortByStr = implode(':', $tmpSortbyArr);
+
+                        $fact1 = $x->facts([$tmpSortByStr])->first();
+
+                        if (empty($fact1)) {
+                            return 1;
+                        } else {
+                            $string1 = $fact1->attribute($attribute);
+                        }
+
+                        $fact2 = $y->facts([$tmpSortByStr])->first();
+    
+                        if (empty($fact2)) {
+                            return -1;
+                        } else {
+                            $string2 = $fact2->attribute($attribute);
+                        }
+
+                    } else { #Fact without attributes
+                        $fact1 = $x->facts([$sortby])->first();
+                        if (empty($fact1)) {
+                            return 1;
+                        } else {
+                            $string1 = $fact1->value();
+                        }
+
+                        $fact2 = $y->facts([$sortby])->first();
+                        if (empty($fact2)) {
+                            return -1;
+                        } else {
+                            $string2 = $fact2->value();
+                        }
+                    }
+
+                    if (empty($string1)) {
+                        return 1;
+                    }
+
+                    if (empty($string2)) {
+                        return -1;
+                    }
+
+                    return strcmp($string1, $string2);
+                    }
+                );
+                break;
+            default:
+                // unsorted or already sorted by SQL
+                break;
+
+            $this->setToParentPrivatePropertyWithReflection('list', $list_parent);
+        }
+
+        $repeats_stack_parent = $this->getFromParentPrivatePropertyWithReflection('repeats_stack');
+        $repeats_stack_parent[] = [
+            $this->getFromParentPrivatePropertyWithReflection('repeats'),
+            $this->getFromParentPrivatePropertyWithReflection('repeat_bytes')
+        ];
+        $this->setToParentPrivatePropertyWithReflection('repeats_stack', $repeats_stack_parent);
+        $parser_parent = $this->getFromParentPrivatePropertyWithReflection('parser');
+        $this->setToParentPrivatePropertyWithReflection('repeat_bytes', xml_get_current_line_number($parser_parent) + 1);
+    }
+
+    /**
+     * Handle <listTotalReset>
+     * Assigns a zero value to list_total, variable that handles the
+     * total number is collected from <list> and <relatives>
+     *
+     * @return void
+     */
+    protected function listTotalResetStartHandler(): void
+    {
+        $this->setToParentPrivatePropertyWithReflection('list_total', 0);
+    }
+}
