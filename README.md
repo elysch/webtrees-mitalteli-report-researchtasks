@@ -24,7 +24,9 @@ Unpack the zip file and place the mitalteli-report-researchtasks folder in the m
 
 Translation
 -----------
-This module not yet contains translatable strings. Those should be added later on.
+This module contains a few translatable textstrings. Copy the file es.php in the resources/lang folder and replace the Spanish text with the translation into your own language. Use the official two-letter language code as file name. Look in the webtrees folder resources/lang to find the correct code.
+
+It would be great if you could share to the community the translated file by [creating a new issue on GitHub][3].
 
 Bugs & feature requests
 -------------------------
