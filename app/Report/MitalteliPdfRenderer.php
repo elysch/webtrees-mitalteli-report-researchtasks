@@ -35,16 +35,8 @@ class MitalteliPdfRenderer extends PdfRenderer
     // Fisharebest\Webtrees\Report\PdfRenderer
     private $parent_reflection_class;
 
-    public function getFromParentPrivatePropertyWithReflection(string $attribute_name) {
-        $property = $this->parent_reflection_class->getProperty($attribute_name);
-        $property->setAccessible(true); // Make the private property accessible
-        return $property->getValue($this); // Get the value from the parent object instance
-    }
-
     public function getFromParentPrivateConstantWithReflection(string $attribute_name) {
         $property = $this->parent_reflection_class->getConstant($attribute_name);
-        #$property->setAccessible(true); // Make the private property accessible
-        #return $property->getValue($this); // Get the value from the parent object instance
         return $property; // Get the value from the parent object instance
     }
 

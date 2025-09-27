@@ -21,6 +21,7 @@ use Fisharebest\Webtrees\Module\ModuleReportTrait;
 use Fisharebest\Webtrees\Module\ModuleGlobalInterface;
 use Fisharebest\Webtrees\Webtrees;
 use Fisharebest\Webtrees\Services\ModuleService;
+use Fisharebest\Localization\Translation;
 
 use VERSION;
 
@@ -208,6 +209,20 @@ class ResearchTasksReportModule extends AbstractModule implements ModuleCustomIn
             
             </script>
             ' . "\n";
+    }
+
+    /**
+     * Additional translations for module.
+     *
+     * @param string $language
+     *
+     * @return string[]
+     */
+    public function customTranslations(string $language): array
+    {
+        $file = $this->resourcesFolder() . 'lang' . DIRECTORY_SEPARATOR . $language . '.php';
+
+        return file_exists($file) ? (new Translation($file))->asArray() : [];
     }
 
     /**
