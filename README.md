@@ -2,7 +2,6 @@ Module for webtrees genealogy software. A Research Tasks Report
 ===============================================================
 
 [![Latest Release](https://img.shields.io/github/release/elysch/webtrees-mitalteli-report-researchtasks.svg)][1]
-[![webtrees major version](https://img.shields.io/badge/webtrees-v2.0.x-green)][2]
 [![webtrees major version](https://img.shields.io/badge/webtrees-v2.1.x-green)][2]
 [![webtrees major version](https://img.shields.io/badge/webtrees-v2.2.x-green)][2]
 [![Downloads](https://img.shields.io/github/downloads/elysch/webtrees-mitalteli-report-researchtasks/total.svg)]()
