@@ -65,10 +65,6 @@ class MitalteliReportGenerate extends ReportGenerate
      */
     public function handle(ServerRequestInterface $request): ResponseInterface
     {
-
-        #error_log((new \ReflectionClass($this))->getShortName() . "-" . __FUNCTION__ .
-        #    "-HHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHH");
-
         $tree   = Validator::attributes($request)->tree();
         $user   = Validator::attributes($request)->user();
         $report = Validator::attributes($request)->string('report');
