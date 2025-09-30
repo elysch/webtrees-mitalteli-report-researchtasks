@@ -17,12 +17,11 @@
 
 declare(strict_types=1);
 
-#namespace Mitalteli\Webtrees\Http\RequestHandlers;
 namespace vendor\WebtreesModules\mitalteli\ResearchTasksReportNamespace\Http\RequestHandlers;
 
-use vendor\WebtreesModules\mitalteli\ResearchTasksReportNamespace\Report\MitalteliReportParserGenerate;
+use vendor\WebtreesModules\mitalteli\ResearchTasksReportNamespace\Report\MitalteliReportParserGenerate_2_1;
 use vendor\WebtreesModules\mitalteli\ResearchTasksReportNamespace\Report\MitalteliHtmlRenderer;
-use vendor\WebtreesModules\mitalteli\ResearchTasksReportNamespace\Report\MitalteliPdfRenderer;
+use vendor\WebtreesModules\mitalteli\ResearchTasksReportNamespace\Report\MitalteliPdfRenderer_2_1;
 use Fisharebest\Webtrees\Http\RequestHandlers\ReportGenerate;
 use Fisharebest\Webtrees\Http\RequestHandlers\ReportListPage;
 
@@ -45,7 +44,7 @@ use function route;
 /**
  * Show all available reports.
  */
-class MitalteliReportGenerate extends ReportGenerate
+class MitalteliReportGenerate_2_1 extends ReportGenerate
 {
 
     public function getFromParentPrivatePropertyWithReflection(string $attribute_name) {
@@ -99,7 +98,7 @@ class MitalteliReportGenerate extends ReportGenerate
             default:
             case 'HTML':
                 ob_start();
-                new MitalteliReportParserGenerate($xml_filename, new MitalteliHtmlRenderer(), $variables, $tree);
+                new MitalteliReportParserGenerate_2_1($xml_filename, new MitalteliHtmlRenderer(), $variables, $tree);
                 $html = ob_get_clean();
 
                 $this->layout = 'layouts/report';
@@ -117,7 +116,7 @@ class MitalteliReportGenerate extends ReportGenerate
 
             case 'PDF':
                 ob_start();
-                new MitalteliReportParserGenerate($xml_filename, new MitalteliPdfRenderer(), $variables, $tree);
+                new MitalteliReportParserGenerate_2_1($xml_filename, new MitalteliPdfRenderer_2_1(), $variables, $tree);
                 $pdf = ob_get_clean();
 
                 $headers = ['content-type' => 'application/pdf'];

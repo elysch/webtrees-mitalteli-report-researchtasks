@@ -70,9 +70,9 @@ use function xml_get_current_line_number;
 use const PREG_SET_ORDER;
  
 /**
- * Class MitalteliReportParserGenerate - parse a report.xml file and generate the report.
+ * Class MitalteliReportParserGenerate_2_1 - parse a report.xml file and generate the report.
  */
-class MitalteliReportParserGenerate extends ReportParserGenerate
+class MitalteliReportParserGenerate_2_1 extends ReportParserGenerate
 {
 
     // Fisharebest\Webtrees\Report\ReportParserGenerate
@@ -122,7 +122,7 @@ class MitalteliReportParserGenerate extends ReportParserGenerate
             die(debug_print_backtrace());
         }
 
-        $this_reflection_class = new \ReflectionClass('\vendor\WebtreesModules\mitalteli\ResearchTasksReportNamespace\Report\MitalteliReportParserGenerate');
+        $this_reflection_class = new \ReflectionClass('\vendor\WebtreesModules\mitalteli\ResearchTasksReportNamespace\Report\MitalteliReportParserGenerate_2_1');
         $this->parent_reflection_class = $this_reflection_class->getParentClass();
                 
         parent::{__FUNCTION__}($report, $report_root, $vars, $tree);
@@ -658,9 +658,9 @@ class MitalteliReportParserGenerate extends ReportParserGenerate
         switch ($listname) {
             case 'pending':
                 if (version_compare(PHP_VERSION, '8.0.0', '>=')) {
-                    require_once 'MitalteliReportParserGenerate-listStartHandler-pending-8.php';
+                    require_once 'MitalteliReportParserGenerate_2_1-listStartHandler-pending-8.php';
                 } else {
-                    require_once 'MitalteliReportParserGenerate-listStartHandler-pending-7.php';
+                    require_once 'MitalteliReportParserGenerate_2_1-listStartHandler-pending-7.php';
                 }
                 break;
 
