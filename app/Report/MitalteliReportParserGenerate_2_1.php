@@ -610,28 +610,22 @@ class MitalteliReportParserGenerate_2_1 extends ReportParserGenerate
 
         /////////////////////////////////////////////////////////////////////////////////////////////////////////
         //                                                                                                     //
-        // TODO REMOVE ENTRIES THAT DO NOT MATCH SELECTED PARAMETERS AND WERE INCLUDED IN THE SQL RESULT       // !ESL
-        //      In a _TODO report, when you try to filter for an entry with sertain text, other results        //
-        //      appear in the sql result because many gedcom entries are stored in the same database field.    //
-        //      The filter text can be found in another fact or event since the LIKE database operator takes   //
-        //      the whole field.                                                                               //
-        //      It could also happen that an entry is removed when it shouldnt be because of the order of the  //
-        //      facts.                                                                                         //
-        //                                                                                                     //
-        //      One partial solution could be to add the filter to the <RepeatTag> tag (repeatTagStartHandler) //
-        //      Another soluction could be to use a regular expression in the sql where clause, if possible.   //
-        //                                                                                                     //
         // TODO SORT THE ENTRIES THAT CAN'T BE SORTED USING SQL.                                               // !ESL
         //      Since many gedcom entries are stored in the same database field, in a _TODO report is          //
         //      not possible to sort entries correctly (AFAICT) since the list is by GedcomRecord and not      //
         //      by fact. A GedcomRecord can have more than one _TODO fact.                                     //
+        //      So, for example, if we have a list of individuals with _TODO facts, and we want to sort them   //
+        //      by _TODO date, we can only sort them by the first _TODO date in the gedcom record.             //
+        //      The same applies to filtering. If we want to filter by _TODO date, we can only filter by the   //
+        //      first _TODO date in the gedcom record.                                                         //
         //                                                                                                     //
         //       ********************************************************************************************  //
         //       *** NOTE: Since the list is based on individuals or families (GedcomRecord), can't apply ***  //
-        //       ***       filters per fact or per fact attribute.                                        ***  //
-        //       ***                                                                                      ***  //
-        //       ***       The printed row filters must be applied in a different way                     ***  //
+        //       ***       filters or sort order per fact or per fact attribute.                          ***  //
         //       ********************************************************************************************  //
+        //                                                                                                     //
+        //       Maybe is possible to sort entries in the repeat array that the <RepeatTag...> tag             //
+	//       (repeatTagStartHandler) uses.                                                                 //
         //                                                                                                     //
         /////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -882,81 +876,7 @@ class MitalteliReportParserGenerate_2_1 extends ReportParserGenerate
         $filters  = [];
         $filters2 = [];
         if (isset($attrs['filter1']) && count($this->getFromParentPrivatePropertyWithReflection('list')) > 0) {
-            foreach ($attrs as $key => $value) {
-                if (preg_match("/filter(\d)/", $key)) {
-                    $condition = $value;
-                    if (preg_match("/@(\w+)/", $condition, $match)) {
-                        $id    = $match[1];
-                        $value = "''";
-                        if ($id === 'ID') {
-                            if (preg_match('/0 @(.+)@/', $this->getFromParentPrivatePropertyWithReflection('gedrec'), $match)) {
-                                $value = "'" . $match[1] . "'";
-                            }
-                        } elseif ($id === 'fact') {
-                            $value = "'" . $this->getFromParentPrivatePropertyWithReflection('fact') . "'";
-                        } elseif ($id === 'desc') {
-                            $value = "'" . $this->getFromParentPrivatePropertyWithReflection('desc') . "'";
-                        } elseif (preg_match("/\d $id (.+)/", $this->getFromParentPrivatePropertyWithReflection('gedrec'), $match)) {
-                            $value = "'" . str_replace('@', '', trim($match[1])) . "'";
-                        }
-                        $condition = preg_replace("/@$id/", $value, $condition);
-                    }
-                    //-- handle regular expressions
-                    if (preg_match("/(?P<tag>" . Gedcom::REGEX_TAG . "(" . ":" . Gedcom::REGEX_TAG . ")*" . ")\s*(?P<expr>[^\s$]+)\s*(?P<val>.+)/", $condition, $match)) {
-                        $tag  = trim($match["tag"]);
-                        $expr = trim($match["expr"]);
-                        $val  = trim($match["val"]);
-                        if (preg_match("/\\$(\w+)/", $val, $match)) {
-                            $vars_parent = $this->getFromParentPrivatePropertyWithReflection('vars');
-                            $val = $vars_parent[$match[1]]['id'];
-                            $val = trim($val);
-                        }
-                        if ($val !== '') {
-                            $searchstr = '';
-                            $tags      = explode(':', $tag);
-                            //-- only limit to a level number if we are specifically looking at a level
-                            if (count($tags) > 1) {
-                                $level = 1;
-                                $t = 'XXXX';
-                                foreach ($tags as $t) {
-                                    if (!empty($searchstr)) {
-                                        $searchstr .= "[^\n]*(\n[2-9][^\n]*)*\n";
-                                    }
-                                    //-- search for both EMAIL and _EMAIL... silly double gedcom standard
-                                    if ($t === 'EMAIL' || $t === '_EMAIL') {
-                                        $t = '_?EMAIL';
-                                    }
-                                    $searchstr .= $level . ' ' . $t;
-                                    $level++;
-                                }
-                            } else {
-                                if ($tag === 'EMAIL' || $tag === '_EMAIL') {
-                                    $tag = '_?EMAIL';
-                                }
-                                $t         = $tag;
-                                $searchstr = '1 ' . $tag;
-                            }
-                            switch ($expr) {
-                                case 'CONTAINS':
-                                    if ($t === 'PLAC') {
-                                        $searchstr .= "[^\n]*[, ]*" . $val;
-                                    } else {
-                                        $searchstr .= "[^\n]*" . $val;
-                                    }
-                                    $filters[] = $searchstr;
-                                    break;
-                                default:
-                                    $filters2[] = [
-                                        'tag'  => $tag,
-                                        'expr' => $expr,
-                                        'val'  => $val,
-                                    ];
-                                    break;
-                            }
-                        }
-                    }
-                }
-            }
+            $this->prepareFactFilters($attrs, $filters, $filters2);
         }
         //-- apply other filters to the list that could not be added to the search string
         if ($filters !== []) {
@@ -976,62 +896,7 @@ class MitalteliReportParserGenerate_2_1 extends ReportParserGenerate
             foreach ($this->getFromParentPrivatePropertyWithReflection('list') as $indi) {
                 $key  = $indi->xref();
                 $grec = $indi->privatizeGedcom(Auth::accessLevel($this->getFromParentPrivatePropertyWithReflection('tree')));
-                $keep = true;
-                foreach ($filters2 as $filter) {
-                    if ($keep) {
-                        $tag  = $filter['tag'];
-                        $expr = $filter['expr'];
-                        $val  = $filter['val'];
-                        if ($val === "''") {
-                            $val = '';
-                        }
-                        $tags = explode(':', $tag);
-                        $t    = end($tags);
-                        $v    = $this->callFromParentPrivateMethodWithReflection('getGedcomValue', $tag, 1, $grec);
-                        //-- check for EMAIL and _EMAIL (silly double gedcom standard :P)
-                        if ($t === 'EMAIL' && empty($v)) {
-                            $tag  = str_replace('EMAIL', '_EMAIL', $tag);
-                            $tags = explode(':', $tag);
-                            $t    = end($tags);
-                            $v    = self::getSubRecord(1, $tag, $grec);
-                        }
-
-                        switch ($expr) {
-                            case 'GTE':
-                                if ($t === 'DATE') {
-                                    $date1 = new Date($v);
-                                    $date2 = new Date($val);
-                                    $keep  = (Date::compare($date1, $date2) >= 0);
-                                } elseif ($val >= $v) {
-                                    $keep = true;
-                                }
-                                break;
-                            case 'LTE':
-                                if ($t === 'DATE') {
-                                    $date1 = new Date($v);
-                                    $date2 = new Date($val);
-                                    $keep  = (Date::compare($date1, $date2) <= 0);
-                                } elseif ($val >= $v) {
-                                    $keep = true;
-                                }
-                                break;
-                            case 'NE':
-                                if ($v != $val) {
-                                    $keep = true;
-                                } else {
-                                    $keep = false;
-                                }
-                                break;
-                            default:
-                                if ($v == $val) {
-                                    $keep = true;
-                                } else {
-                                    $keep = false;
-                                }
-                                break;
-                        }
-                    }
-                }
+                $keep = $this->applyFactFilters($grec, $filters2);
                 if ($keep) {
                     $mylist[$key] = $indi;
                 }
@@ -1197,4 +1062,274 @@ class MitalteliReportParserGenerate_2_1 extends ReportParserGenerate
     {
         $this->setToParentPrivatePropertyWithReflection('list_total', 0);
     }
+
+    /**
+     * Prepare filters that cannot be applied using SQL
+     *
+     * @param array<int,string> $attrs    The attributes from the XML tag
+     * @param array<int,string> $filters  The filters that can be applied using regular expressions
+     * @param array<int,array{tag:string,expr:string,val:string}> $filters2 The filters that need to be applied using PHP
+     *
+     * @return void
+     */
+    protected function prepareFactFilters(array $attrs, array &$filters, array &$filters2): void
+    {
+        $condition = '';
+        $match     = [];
+        $filters  = [];
+        $filters2 = [];
+
+        foreach ($attrs as $key => $value) {
+            if (preg_match("/filter(\d)/", $key)) {
+                $condition = $value;
+                if (preg_match("/@(\w+)/", $condition, $match)) {
+                    $id    = $match[1];
+                    $value = "''";
+                    if ($id === 'ID') {
+                        if (preg_match('/0 @(.+)@/', $this->getFromParentPrivatePropertyWithReflection('gedrec'), $match)) {
+                            $value = "'" . $match[1] . "'";
+                        }
+                    } elseif ($id === 'fact') {
+                        $value = "'" . $this->getFromParentPrivatePropertyWithReflection('fact') . "'";
+                    } elseif ($id === 'desc') {
+                        $value = "'" . $this->getFromParentPrivatePropertyWithReflection('desc') . "'";
+                    } elseif (preg_match("/\d $id (.+)/", $this->getFromParentPrivatePropertyWithReflection('gedrec'), $match)) {
+                        $value = "'" . str_replace('@', '', trim($match[1])) . "'";
+                    }
+                    $condition = preg_replace("/@$id/", $value, $condition);
+                }
+                //-- handle regular expressions
+                if (preg_match("/(?P<tag>" . Gedcom::REGEX_TAG . "(" . ":" . Gedcom::REGEX_TAG . ")*" . ")\s*(?P<expr>[^\s$]+)\s*(?P<val>.+)/", $condition, $match)) {
+                    $tag  = trim($match["tag"]);
+                    $expr = trim($match["expr"]);
+                    $val  = trim($match["val"]);
+                    if (preg_match("/\\$(\w+)/", $val, $match)) {
+                        $vars_parent = $this->getFromParentPrivatePropertyWithReflection('vars');
+                        $val = $vars_parent[$match[1]]['id'];
+                        $val = trim($val);
+                    }
+                    if ($val !== '') {
+                        $searchstr = '';
+                        $tags      = explode(':', $tag);
+                        //-- only limit to a level number if we are specifically looking at a level
+                        if (count($tags) > 1) {
+                            $level = 1;
+                            $t = 'XXXX';
+                            foreach ($tags as $t) {
+                                if (!empty($searchstr)) {
+                                    $searchstr .= "[^\n]*(\n[2-9][^\n]*)*\n";
+                                }
+                                //-- search for both EMAIL and _EMAIL... silly double gedcom standard
+                                if ($t === 'EMAIL' || $t === '_EMAIL') {
+                                    $t = '_?EMAIL';
+                                }
+                                $searchstr .= $level . ' ' . $t;
+                                $level++;
+                            }
+                        } else {
+                            if ($tag === 'EMAIL' || $tag === '_EMAIL') {
+                                $tag = '_?EMAIL';
+                            }
+                            $t         = $tag;
+                            $searchstr = '1 ' . $tag;
+                        }
+                        switch ($expr) {
+                            case 'CONTAINS':
+                                if ($t === 'PLAC') {
+                                    $searchstr .= "[^\n]*[, ]*" . $val;
+                                } else {
+                                    $searchstr .= "[^\n]*" . $val;
+                                }
+                                $filters[] = $searchstr;
+                                break;
+                            default:
+                                $filters2[] = [
+                                    'tag'  => $tag,
+                                    'expr' => $expr,
+                                    'val'  => $val,
+                                ];
+                                break;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+     * Apply filters that could not be applied using SQL
+     *
+     * @param string $grec    The gedcom record to check
+     * @param array<int,array{tag:string,expr:string,val:string}> $filters2 The filters to apply
+     *
+     * @return bool true to keep the record, false to remove it from the list
+     */
+    protected function applyFactFilters(string $grec, array $filters2): bool
+    {
+        $keep = true;
+        foreach ($filters2 as $filter) {
+            if ($keep) {
+                $tag  = $filter['tag'];
+                $expr = $filter['expr'];
+                $val  = $filter['val'];
+                if ($val === "''") {
+                    $val = '';
+                }
+                $tags = explode(':', $tag);
+                $t    = end($tags);
+
+                $facts_values_array = [];
+
+                if (str_ends_with($expr, '_ANY')) {
+                    $v = new Date($val);
+                } else {
+                    $facts_values_array[] = $this->callFromParentPrivateMethodWithReflection('getGedcomValue', $tag, 1, $grec);
+
+                }
+
+                foreach ($facts_values_array as $v) {
+                    if ($v === null) {
+                        $v = '';
+                    }
+                }
+
+
+                //-- check for EMAIL and _EMAIL (silly double gedcom standard :P)
+                if ($t === 'EMAIL' && empty($v)) {
+                    $tag  = str_replace('EMAIL', '_EMAIL', $tag);
+                    $tags = explode(':', $tag);
+                    $t    = end($tags);
+                    $v    = self::getSubRecord(1, $tag, $grec);
+                }
+
+                switch ($expr) {
+                    case 'GTE':
+                        if ($t === 'DATE') {
+                            $date1 = new Date($v);
+                            $date2 = new Date($val);
+                            $keep  = (Date::compare($date1, $date2) >= 0);
+                        } elseif ($val >= $v) {
+                            $keep = true;
+                        }
+                        break;
+                    case 'LTE':
+                        if ($t === 'DATE') {
+                            $date1 = new Date($v);
+                            $date2 = new Date($val);
+                            $keep  = (Date::compare($date1, $date2) <= 0);
+                        } elseif ($val >= $v) {
+                            $keep = true;
+                        }
+                        break;
+                    case 'NE':
+                        if ($v != $val) {
+                            $keep = true;
+                        } else {
+                            $keep = false;
+                        }
+                        break;
+                    default:
+                        if ($v == $val) {
+                            $keep = true;
+                        } else {
+                            $keep = false;
+                        }
+                        break;
+                }
+            }
+        }
+
+        return $keep;
+
+    }
+
+    /**
+     * Handle <repeatTag>
+     *
+     * @param array<string> $attrs
+     *
+     * @return void
+     */
+    protected function repeatTagStartHandler(array $attrs): void
+    {
+        $this->setToParentPrivatePropertyWithReflection('process_repeats', $this->getFromParentPrivatePropertyWithReflection('process_repeats')+1);
+        if ($this->getFromParentPrivatePropertyWithReflection('process_repeats') > 1) {
+            return;
+        }
+
+        $repeats_stack = $this->getFromParentPrivatePropertyWithReflection('repeats_stack');
+        $repeats_stack[] = [$this->getFromParentPrivatePropertyWithReflection('repeats'), $this->getFromParentPrivatePropertyWithReflection('repeat_bytes')];
+        $this->setToParentPrivatePropertyWithReflection('repeats_stack', $repeats_stack);
+
+        $this->setToParentPrivatePropertyWithReflection('repeats', []);
+
+        $this->setToParentPrivatePropertyWithReflection('repeat_bytes', xml_get_current_line_number($this->getFromParentPrivatePropertyWithReflection('parser')));
+
+        $tag = $attrs['tag'] ?? '';
+        if (!empty($tag)) {
+            if ($tag === '@desc') {
+                $value = $this->getFromParentPrivatePropertyWithReflection('desc');
+                $value = trim($value);
+                $this->getFromParentPrivatePropertyWithReflection('current_element')->addText($value);
+            } else {
+                $tag   = str_replace('@fact', $this->getFromParentPrivatePropertyWithReflection('fact'), $tag);
+                $tags  = explode(':', $tag);
+                $level = (int) explode(' ', trim($this->getFromParentPrivatePropertyWithReflection('gedrec')))[0];
+                if ($level === 0) {
+                    $level++;
+                }
+                $subrec = $this->getFromParentPrivatePropertyWithReflection('gedrec');
+                $t      = $tag;
+                $count  = count($tags);
+                $i      = 0;
+                while ($i < $count) {
+                    $t = $tags[$i];
+                    if (!empty($t)) {
+                        if ($i < ($count - 1)) {
+                            $subrec = self::getSubRecord($level, "$level $t", $subrec);
+                            if (empty($subrec)) {
+                                $level--;
+                                $subrec = self::getSubRecord($level, "@ $t", $this->getFromParentPrivatePropertyWithReflection('gedrec'));
+                                if (empty($subrec)) {
+                                    return;
+                                }
+                            }
+                        }
+                        $level++;
+                    }
+                    $i++;
+                }
+                $level--;
+                $count = preg_match_all("/$level $t(.*)/", $subrec, $match, PREG_SET_ORDER);
+                $i     = 0;
+                while ($i < $count) {
+                    $i++;
+                    // Privacy check - is this a link, and are we allowed to view the linked object?
+                    $subrecord = self::getSubRecord($level, "$level $t", $subrec, $i);
+                    if (preg_match('/^\d ' . Gedcom::REGEX_TAG . ' @(' . Gedcom::REGEX_XREF . ')@/', $subrecord, $xref_match)) {
+                        $linked_object = Registry::gedcomRecordFactory()->make($xref_match[1], $this->getFromParentPrivatePropertyWithReflection('tree'));
+                        if ($linked_object && !$linked_object->canShow()) {
+                            continue;
+                        }
+                    }
+                    $repeats = $this->getFromParentPrivatePropertyWithReflection('repeats');
+
+                    $filters  = [];
+                    $filters2 = [];
+                    $this->prepareFactFilters($attrs, $filters, $filters2);
+
+                    if ($filters2 !== []) {
+                            $keep = $this->applyFactFilters($subrecord, $filters2);
+                            if ($keep) {
+                                $repeats[] = $subrecord;
+                            }
+                    } else {
+                                $repeats[] = $subrecord;
+                    }
+
+                    $this->setToParentPrivatePropertyWithReflection('repeats', $repeats);
+                }
+            }
+        }
+    }    
 }
