@@ -187,7 +187,7 @@
                 </if>
 
                 <!-- THERE CAN BE MORE THAN ONE _TODO ENTRY -->
-                <RepeatTag tag="_TODO" filter5="$hideEmptyDatesFilter" filter4="LIKE /%\n1 _TODO%$filter_rt%/" filter2="_TODO:DATE GTE $date1" filter3="_TODO:DATE LTE $date2">
+                <RepeatTag tag="_TODO" filter5="$hideEmptyDatesFilter" filter4="_TODO CONTAINS_R NEEDLE='$filter_rt' HAYSTACK_WANT_R='2 CONT|2 NOTE|3 CONT' HAYSTACK_DONT_WANT_R='2 DATE|2 _WT_USER' REPEAT_W_DW_R=3 HAYSTACK_REPLACE_R='\1\2\3' REMOVE_WANT_IN_HAYSTACK=1" filter2="_TODO:DATE GTE $date1" filter3="_TODO:DATE LTE $date2">
 
                     <!-- XREF -->
                     <if condition="$showXref=='on'">
@@ -205,7 +205,7 @@
                     <Cell width="200" style="text">
                         <!-- Only with multiple sources use line feed (br) -->
                         <SetVar name="usebr" value="0"/>
-                        <RepeatTag tag="_TODO:NOTE" filter4="LIKE /%\n1 _TODO%$filter_rt%/">
+                        <RepeatTag tag="_TODO:NOTE">
                             <GedcomValue tag="NOTE" />
                         </RepeatTag>
                     </Cell>
@@ -270,7 +270,7 @@
                 <GetPersonName id="" setvar="Name"/>
 
                 <!-- THERE CAN BE MORE THAN ONE _TODO ENTRY -->
-                <RepeatTag tag="_TODO" filter5="$hideEmptyDatesFilter" filter4="LIKE /%\n1 _TODO%$filter_rt%/" filter2="_TODO:DATE GTE $date1" filter3="_TODO:DATE LTE $date2">
+                <RepeatTag tag="_TODO" filter5="$hideEmptyDatesFilter" filter4="_TODO CONTAINS_R NEEDLE='$filter_rt' HAYSTACK_WANT_R='2 CONT|2 NOTE|3 CONT' HAYSTACK_DONT_WANT_R='2 DATE|2 _WT_USER' REPEAT_W_DW_R=3 HAYSTACK_REPLACE_R='\1\2\3' REMOVE_WANT_IN_HAYSTACK=1" filter2="_TODO:DATE GTE $date1" filter3="_TODO:DATE LTE $date2">
 
                     <!-- XREF -->
                     <if condition="$showXref=='on'">
@@ -288,7 +288,7 @@
                     <Cell width="200" style="text">
                         <!-- Only with multiple sources use line feed (br) -->
                         <SetVar name="usebr" value="0"/>
-                        <RepeatTag tag="_TODO:NOTE" filter4="LIKE /%\n1 _TODO%$filter_rt%/">
+                        <RepeatTag tag="_TODO:NOTE">
                             <GedcomValue tag="NOTE" />
                         </RepeatTag>
                     </Cell>

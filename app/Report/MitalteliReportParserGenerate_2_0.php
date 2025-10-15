@@ -108,18 +108,50 @@ class MitalteliReportParserGenerate_2_0 extends ReportParserGenerate
 
     private $tag_url;
 
-    public function getFromParentPrivatePropertyWithReflection(string $attribute_name) {
+
+    /**
+     * Get the value of a private property from the parent class using reflection
+     *
+     * @param string $attribute_name The name of the private property in the parent class
+     *
+     * @return mixed The value of the private property
+     *
+     * @throws \ReflectionException If the property does not exist
+     */
+    public function getFromParentPrivatePropertyWithReflection(string $attribute_name)
+    {
         $property = $this->parent_reflection_class->getProperty($attribute_name);
         $property->setAccessible(true); // Make the private property accessible
         return $property->getValue($this); // Get the value from the parent object instance
     }
 
-    public function setToParentPrivatePropertyWithReflection(string $attribute_name, $value) {
+    /**
+     * Set the value of a private property from the parent class using reflection
+     *
+     * @param string $attribute_name The name of the private property in the parent class
+     * @param mixed  $value          The value to set
+     *
+     * @return void
+     *
+     * @throws \ReflectionException If the property does not exist
+     */
+    public function setToParentPrivatePropertyWithReflection(string $attribute_name, $value)
+    {
         $property = $this->parent_reflection_class->getProperty($attribute_name);
         $property->setAccessible(true);
         $property->setValue($this, $value); // Set the value on the parent object instance
     }
 
+    /**
+     * Call a private method from the parent class using reflection
+     *
+     * @param string $methodName The name of the private method in the parent class
+     * @param mixed  ...$params  The parameters to pass to the method
+     *
+     * @return mixed The return value of the private method
+     *
+     * @throws \ReflectionException If the method does not exist
+     */
     public function callFromParentPrivateMethodWithReflection($methodName)
     {
         if (!method_exists($this, $methodName)) {
@@ -653,7 +685,7 @@ class MitalteliReportParserGenerate_2_0 extends ReportParserGenerate
         //       ********************************************************************************************  //
         //                                                                                                     //
         //       Maybe is possible to sort entries in the repeat array that the <RepeatTag...> tag             //
-	//       (repeatTagStartHandler) uses.                                                                 //
+        //       (repeatTagStartHandler) uses.                                                                 //
         //                                                                                                     //
         /////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -1105,11 +1137,152 @@ class MitalteliReportParserGenerate_2_0 extends ReportParserGenerate
     }
 
     /**
-     * Prepare filters that cannot be applied using SQL
+     * Convert a string representation of a boolean to a boolean
      *
-     * @param array<int,string> $attrs    The attributes from the XML tag
-     * @param array<int,string> $filters  The filters that can be applied using regular expressions
-     * @param array<int,array{tag:string,expr:string,val:string}> $filters2 The filters that need to be applied using PHP
+     * Accepts the following case-insensitive values:
+     * - True values: '1', 'true', 'yes', 'on'
+     * - False values: '0', 'false', 'no', 'off'
+     * - Empty or not set string is considered false
+     *
+     * @param string $value The input string to convert
+     *
+     * @return bool The converted boolean value
+     *
+     * @throws InvalidArgumentException if the input string is not a valid boolean representation
+     */
+    public function convertValueToBool(string $value): bool
+    {
+        $trueValues  = ['1', 'true', 'yes', 'on'];
+        $falseValues = ['0', 'false', 'no', 'off'];
+
+        $lowerValue = '';
+        if (isset($value)) {
+            $lowerValue = strtolower($value);
+        }
+
+        if (empty($lowerValue) || in_array($lowerValue, $falseValues, true)) {
+            return false;
+        }
+
+        if (in_array($lowerValue, $trueValues, true)) {
+            return true;
+        }
+
+        throw new InvalidArgumentException("Invalid boolean string: $value");
+    }
+
+    /**
+     * Parse a string of key=value pairs into an associative array
+     *
+     * This function handles quoted values and spaces within values.
+     * It supports single quotes, double quotes, and unquoted values.
+     *
+     * @param string $inputString The input string containing key=value pairs
+     *
+     * @return array An associative array of parsed key-value pairs
+     */
+    public function parseKeyValueString(string $inputString): array
+    {
+        $result = [];
+        // Regex to match key=value pairs, handling quoted values and spaces
+        // It captures:
+        // 1. The key (non-whitespace characters before '=')
+        // 2. The value (either unquoted or single/double-quoted)
+        preg_match_all('/(\S+)=(?:(?:\'([^\']*)\')|(?:"([^"]*)")|(\S+))(?:\s|$)/', $inputString, $matches, PREG_SET_ORDER);
+
+        foreach ($matches as $match) {
+            $key = $match[1];
+            $value = null;
+
+            // Determine the actual value based on which capture group matched
+            if (isset($match[2]) && $match[2] !== '') { // Single-quoted value
+                $value = $match[2];
+            } elseif (isset($match[3]) && $match[3] !== '') { // Double-quoted value
+                $value = $match[3];
+            } elseif (isset($match[4]) && $match[4] !== '') { // Unquoted value
+                $value = $match[4];
+            }
+
+            $result[$key] = $value;
+        }
+
+        return $result;
+    }
+
+    /**
+     * Generate search and replace strings from a CONTAINS_R filter
+     *
+     * @param string $tag The GEDCOM tag to search within (e.g., '_TODO')
+     * @param string $val The value string containing parameters for the filter
+     *
+     * @return array{SEARCH:string,REPLACE:string,REMOVE:bool,HAYSTACK_WANT_R:string,NEEDLE:string}
+     *
+     * @throws DomainException if the NEEDLE argument is missing
+     */
+    public function searchReplaceStringsFromContainsRegexString(string $tag, string $val): array
+    {
+        // Example usage:
+        // filter4="_TODO CONTAINS_R NEEDLE='$filter_rt' HAYSTACK_WANT_R='2 CONT|2 NOTE|3 CONT' HAYSTACK_DONT_WANT_R='2 DATE|2 _WT_USER' REPEAT_W_DW_R=3 HAYSTACK_REPLACE_R='\1\2\3' REMOVE_WANT_IN_HAYSTACK=1"
+        // filter4="_TODO:NOTE CONTAINS_R NEEDLE='$filter_rt' HAYSTACK_WANT_R='3 CONT' REMOVE_WANT_IN_HAYSTACK=1"
+
+        #REGEX TO GET ALL TEXT VALUES FROM _TODO: /((?:\n((?:1 _TODO|2 CONT|2 NOTE|3 CONT) ?).*)*)(?:(?:\n(?:2 DATE|2 _WT_USER) ?.*)*)((?:\n((?:1 _TODO|2 CONT|2 NOTE|3 CONT) ?).*)*)(?:(?:\n(?:2 DATE|2 _WT_USER) ?.*)*)((?:\n((?:1 _TODO|2 CONT|2 NOTE|3 CONT) ?).*)*)/
+        #THE RESULT IS IN \1\2\3
+        #THE RESULT CONTAINS ALL THE _TODO LINES, THE CONT AND NOTE LINES, BUT NOT THE DATE AND _WT_USER LINES
+        #AFTER THAT IT'S NEEDED TO REMOVE FROM THE RESULT THE STRINGS: "1 _TODO", "2 CONT", "2 NOTE" AND "3 CONT"
+
+        $args = $this->parseKeyValueString($val);
+
+        if (!isset($args['NEEDLE'])) {
+            throw new DomainException('CONTAINS_R requires a NEEDLE argument');
+        }
+
+        if (!isset($args['HAYSTACK_WANT_R'])) {
+            $args['HAYSTACK_WANT_R'] = '';
+        }
+
+        if (!isset($args['REPEAT_W_DW_R'])) {
+            $args['REPEAT_W_DW_R'] = 1;
+        }
+
+        if (!isset($args['HAYSTACK_DONT_WANT_R'])) {
+            $args['HAYSTACK_DONT_WANT_R'] = '';
+        }
+
+        $searchstr = '';
+        $searchWant = '((?:\n(?:1 ' . $tag;
+        $searchDontwant = '';
+
+        # Build the HAYSTACK_WANT_R part
+        if (!empty($args['HAYSTACK_WANT_R'])) {
+            $searchWant .= '|' . $args['HAYSTACK_WANT_R'];
+        }
+        $searchWant .= ') ?.*)*)';
+
+        # Build the HAYSTACK_DONT_WANT_R part
+        if (!empty($args['HAYSTACK_DONT_WANT_R'])) {
+            $searchDontwant = '(?:(?:\n(?:' . $args['HAYSTACK_DONT_WANT_R'] . ') ?.*)*)';
+        }
+
+        for ($i = 0; $i < (int)$args['REPEAT_W_DW_R']; $i++) {
+            $searchstr .= $searchWant . $searchDontwant;
+        }
+
+        return [
+            'SEARCH' => $searchstr,
+            'REPLACE' => $args['HAYSTACK_REPLACE_R'] ?? '\0',
+            'REMOVE' => $this->convertValueToBool($args['REMOVE_WANT_IN_HAYSTACK']),
+            'REMOVE' => !empty($args['REMOVE_WANT_IN_HAYSTACK']) ?? false,
+            'HAYSTACK_WANT_R' => $args['HAYSTACK_WANT_R'],
+            'NEEDLE' => $args['NEEDLE'],
+        ];
+    }
+
+    /**
+     * Prepare the filters that cannot be applied using SQL
+     *
+     * @param array<string,string> $attrs    The attributes from the XML tag
+     * @param array<string,string>    $filters  The filters that can be applied using regex on the gedcom record
+     * @param array<string,array{tag:string,expr?:string,val?:string,searchstr?:string,replacestr?:string,remove?:bool,want_regex?:string,needlestr?:string}> $filters2 The filters that need to be applied using PHP
      *
      * @return void
      */
@@ -1117,8 +1290,8 @@ class MitalteliReportParserGenerate_2_0 extends ReportParserGenerate
     {
         $condition = '';
         $match     = [];
-        $filters  = [];
-        $filters2 = [];
+        $filters   = [];
+        $filters2  = [];
 
         foreach ($attrs as $key => $value) {
             if (preg_match("/filter(\d)/", $key)) {
@@ -1146,8 +1319,10 @@ class MitalteliReportParserGenerate_2_0 extends ReportParserGenerate
                     $val  = trim($match["val"]);
                     if (preg_match("/\\$(\w+)/", $val, $match)) {
                         $vars_parent = $this->getFromParentPrivatePropertyWithReflection('vars');
-                        $val = $vars_parent[$match[1]]['id'];
-                        $val = trim($val);
+                        //-- Replace all occurrences of $var in the value with the actual value from the vars array with word boundary anchors (\b) in order to prevent middle-word replacements
+                        //-- It also uses unicode mode (/u) to handle UTF-8 characters correctly
+                        $regex = '/[$]' . $match[1] . '\b/u';
+                        $val = preg_replace($regex, trim($vars_parent[$match[1]]['id']), $val);
                     }
                     if ($val !== '') {
                         $searchstr = '';
@@ -1183,6 +1358,18 @@ class MitalteliReportParserGenerate_2_0 extends ReportParserGenerate
                                 }
                                 $filters[] = $searchstr;
                                 break;
+                            case 'CONTAINS_R':
+                                $strings = $this->searchReplaceStringsFromContainsRegexString($tag, $val);
+
+                                $filters2[] = [
+                                    'tag'  => $tag,
+                                    'searchstr' => $strings['SEARCH'],
+                                    'replacestr'  => $strings['REPLACE'],
+                                    'remove' => $strings['REMOVE'],
+                                    'want_regex' => $strings['HAYSTACK_WANT_R'],
+                                    'needlestr'  => $strings['NEEDLE'],
+                                ];
+                                break;
                             default:
                                 $filters2[] = [
                                     'tag'  => $tag,
@@ -1198,102 +1385,122 @@ class MitalteliReportParserGenerate_2_0 extends ReportParserGenerate
     }
 
     /**
-     * Apply filters that could not be applied using SQL
+     * Apply the filters that cannot be applied using SQL
      *
-     * @param string $grec    The gedcom record to check
-     * @param array<int,array{tag:string,expr:string,val:string}> $filters2 The filters to apply
+     * @param string $grec    The gedcom record to apply the filters to
+     * @param array<string,array{tag:string,expr?:string,val?:string,searchstr?:string,replacestr?:string,remove?:bool,want_regex?:string,needlestr?:string}> $filters2 The filters to apply
      *
-     * @return bool true to keep the record, false to remove it from the list
+     * @return bool true if the record passes all filters, false otherwise
      */
     protected function applyFactFilters(string $grec, array $filters2): bool
     {
         $keep = true;
         foreach ($filters2 as $filter) {
             if ($keep) {
-                $tag  = $filter['tag'];
-                $expr = $filter['expr'];
-                $val  = $filter['val'];
-                if ($val === "''") {
-                    $val = '';
-                }
-                $tags = explode(':', $tag);
-                $t    = end($tags);
+                $search_exists  = isset($filter['searchstr']);
 
-                $facts_values_array = [];
+                if (!$search_exists) {
+                    $tag  = $filter['tag'];
+                    $expr = $filter['expr'];
+                    $val  = $filter['val'];
+                    if ($val === "''") {
+                        $val = '';
+                    }
+                    $tags = explode(':', $tag);
+                    $t    = end($tags);
 
-                if (str_ends_with($expr, '_ANY')) {
-                    $v = new Date($val);
-                } else {
-                    $facts_values_array[] = $this->callFromParentPrivateMethodWithReflection('getGedcomValue', $tag, 1, $grec);
-
-                }
-
-                foreach ($facts_values_array as $v) {
+                    $v = $this->callFromParentPrivateMethodWithReflection('getGedcomValue', $tag, 1, $grec);
                     if ($v === null) {
                         $v = '';
                     }
-                }
 
+                    //-- check for EMAIL and _EMAIL (silly double gedcom standard :P)
+                    if ($t === 'EMAIL' && empty($v)) {
+                        $tag  = str_replace('EMAIL', '_EMAIL', $tag);
+                        $tags = explode(':', $tag);
+                        $t    = end($tags);
+                        $v    = self::getSubRecord(1, $tag, $grec);
+                    }
 
-                //-- check for EMAIL and _EMAIL (silly double gedcom standard :P)
-                if ($t === 'EMAIL' && empty($v)) {
-                    $tag  = str_replace('EMAIL', '_EMAIL', $tag);
-                    $tags = explode(':', $tag);
-                    $t    = end($tags);
-                    $v    = self::getSubRecord(1, $tag, $grec);
-                }
+                    switch ($expr) {
+                        case 'GTE':
+                            if ($t === 'DATE') {
+                                $date1 = new Date($v);
+                                $date2 = new Date($val);
+                                $keep  = (Date::compare($date1, $date2) >= 0);
+                            } elseif ($val >= $v) {
+                                $keep = true;
+                            }
+                            break;
+                        case 'LTE':
+                            if ($t === 'DATE') {
+                                $date1 = new Date($v);
+                                $date2 = new Date($val);
+                                $keep  = (Date::compare($date1, $date2) <= 0);
+                            } elseif ($val >= $v) {
+                                $keep = true;
+                            }
+                            break;
+                        case 'NE':
+                            if ($v != $val) {
+                                $keep = true;
+                            } else {
+                                $keep = false;
+                            }
+                            break;
+                        default:
+                            if ($v == $val) {
+                                $keep = true;
+                            } else {
+                                $keep = false;
+                            }
+                            break;
+                    }
+                } else {
+                    $tag         = $filter['tag'];
+                    $searchstr   = $filter['searchstr'];
+                    $replacestr  = $filter['replacestr'];
+                    $remove      = $filter['remove'];
+                    $want_regex  = $filter['want_regex'];
+                    $needlestr   = $filter['needlestr'];
 
-                switch ($expr) {
-                    case 'GTE':
-                        if ($t === 'DATE') {
-                            $date1 = new Date($v);
-                            $date2 = new Date($val);
-                            $keep  = (Date::compare($date1, $date2) >= 0);
-                        } elseif ($val >= $v) {
-                            $keep = true;
-                        }
-                        break;
-                    case 'LTE':
-                        if ($t === 'DATE') {
-                            $date1 = new Date($v);
-                            $date2 = new Date($val);
-                            $keep  = (Date::compare($date1, $date2) <= 0);
-                        } elseif ($val >= $v) {
-                            $keep = true;
-                        }
-                        break;
-                    case 'NE':
-                        if ($v != $val) {
-                            $keep = true;
-                        } else {
-                            $keep = false;
-                        }
-                        break;
-                    default:
-                        if ($v == $val) {
-                            $keep = true;
-                        } else {
-                            $keep = false;
-                        }
-                        break;
+                    $haystack = "\n" . $grec;
+
+                    $haystack = preg_replace('/' . $searchstr . '/', $replacestr, $haystack);
+
+                    if ($remove) {
+                        //-- Remove the want regex from the haystack if requested
+                        $regex = '\n(?:1 ' . $tag . '|' . $want_regex . ') ?';
+                        $haystack = preg_replace("/" . $regex . "/", "\n", $haystack);
+                    }
+
+                    //-- Check if the needle exists in the haystack
+                    #if (!preg_match('/' . preg_quote($needlestr, '/') . '/i', $haystack)) {
+                    if (!preg_match('/' . $needlestr . '/i', $haystack)) {
+                        $keep = false;
+                        continue;
+                    }
                 }
             }
         }
 
         return $keep;
-
     }
 
     /**
      * Handle <repeatTag>
+     * Collects all the sub-records that match the tag and optional filters
+     * and stores them in the repeats array
      *
-     * @param array<string> $attrs
+     * @param array<string,string> $attrs The attributes from the XML tag
      *
      * @return void
+     *
+     * @throws DomainException if an invalid tag is provided
      */
     protected function repeatTagStartHandler(array $attrs): void
     {
-        $this->setToParentPrivatePropertyWithReflection('process_repeats', $this->getFromParentPrivatePropertyWithReflection('process_repeats')+1);
+        $this->setToParentPrivatePropertyWithReflection('process_repeats', $this->getFromParentPrivatePropertyWithReflection('process_repeats') + 1);
         if ($this->getFromParentPrivatePropertyWithReflection('process_repeats') > 1) {
             return;
         }
@@ -1359,18 +1566,30 @@ class MitalteliReportParserGenerate_2_0 extends ReportParserGenerate
                     $filters2 = [];
                     $this->prepareFactFilters($attrs, $filters, $filters2);
 
-                    if ($filters2 !== []) {
+                    $keep  = true;
+                    if ($filters !== []) {
+                        foreach ($filters as $filter) {
+                            if (!preg_match('/' . $filter . '/i', $subrecord)) {
+                                $keep = false;
+                                break;
+                            }
+                        }
+                    }
+
+                    if ($keep) {
+                        if ($filters2 !== []) {
                             $keep = $this->applyFactFilters($subrecord, $filters2);
                             if ($keep) {
                                 $repeats[] = $subrecord;
                             }
-                    } else {
-                                $repeats[] = $subrecord;
+                        } else {
+                            $repeats[] = $subrecord;
+                        }
                     }
 
                     $this->setToParentPrivatePropertyWithReflection('repeats', $repeats);
                 }
             }
         }
-    }    
+    }
 }
