@@ -19,6 +19,8 @@ declare(strict_types=1);
 
 namespace vendor\WebtreesModules\mitalteli\ResearchTasksReportNamespace\Report;
 
+use vendor\WebtreesModules\mitalteli\ResearchTasksReportNamespace\ResearchTasksReportModule;
+
 use IntlDateFormatter;
 use Fisharebest\Webtrees\Session;
 use Fisharebest\Webtrees\Report\TcpdfWrapper;
@@ -30,6 +32,12 @@ class MitalteliTcpdfWrapper extends TcpdfWrapper
 {
     private function site_info(): string
     {
+        // Check if the report string contains the module directory path
+        // if not running from this module, redirect to the standard ReportGenerate handler
+        if (!str_contains($this->title, ResearchTasksReportModule::REPORT_TITLE)) {
+            return parent::{__FUNCTION__}(); // Call the parent method
+        }
+
         $site = "";
         $tree = "";
         $value = "";
@@ -54,6 +62,13 @@ class MitalteliTcpdfWrapper extends TcpdfWrapper
 
 
     public function Footer() {
+        // Check if the report string contains the module directory path
+        // if not running from this module, redirect to the standard ReportGenerate handler
+        if (!str_contains($this->title, ResearchTasksReportModule::REPORT_TITLE)) {
+            parent::{__FUNCTION__}(); // Call the parent method and
+            return;
+        }
+
         $pw = $this->getPageWidth();
         $marg = $this->getMargins();
         $lmarg = $marg['left'];

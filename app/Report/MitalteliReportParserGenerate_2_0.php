@@ -19,12 +19,15 @@ declare(strict_types=1);
 
 namespace vendor\WebtreesModules\mitalteli\ResearchTasksReportNamespace\Report;
 
+use vendor\WebtreesModules\mitalteli\ResearchTasksReportNamespace\ResearchTasksReportModule;
+
 use Fisharebest\Webtrees\Report\ReportParserGenerate;
 use Fisharebest\Webtrees\Report\AbstractRenderer;
 
 use VERSION;
 
 use DomainException;
+use InvalidArgumentException;
 use Fisharebest\Webtrees\Date;
 use Fisharebest\Webtrees\Elements\UnknownElement;
 use Fisharebest\Webtrees\Factories\MarkdownFactory;
@@ -180,17 +183,14 @@ class MitalteliReportParserGenerate_2_0 extends ReportParserGenerate
         Tree $tree,
         FilesystemInterface $data_filesystem
     ) {
-        if (is_null($report_root)) {
-            echo "report_root: " . print_r($report_root, true) . "\n\n";
-            echo "vars: " . print_r($vars, true) . "\n\n";
+        $coreWebtreesCustomizationDir = ResearchTasksReportModule::getCoreWebtreesCustomizationDirectory();
 
-            echo (new \ReflectionClass($this))->getShortName() . "-" . __FUNCTION__ . ", debug_print_backtrace():\n\n";
-            die(debug_print_backtrace());
+        // Check if the report string contains the module directory path
+        // if not running from this module, redirect to the standard ReportGenerate handler
+        if (str_contains($report, $coreWebtreesCustomizationDir)) {
+            $this_reflection_class = new \ReflectionClass('\vendor\WebtreesModules\mitalteli\ResearchTasksReportNamespace\Report\MitalteliReportParserGenerate_2_0');
+            $this->parent_reflection_class = $this_reflection_class->getParentClass();
         }
-
-        $this_reflection_class = new \ReflectionClass('\vendor\WebtreesModules\mitalteli\ResearchTasksReportNamespace\Report\MitalteliReportParserGenerate_2_0');
-        $this->parent_reflection_class = $this_reflection_class->getParentClass();
-                
         parent::{__FUNCTION__}($report, $report_root, $vars, $tree, $data_filesystem);
     }
 
@@ -243,6 +243,15 @@ class MitalteliReportParserGenerate_2_0 extends ReportParserGenerate
      */
     protected function getPersonNameStartHandler(array $attrs): void
     {
+        $coreWebtreesCustomizationDir = ResearchTasksReportModule::getCoreWebtreesCustomizationDirectory();
+
+        // Check if the report string contains the module directory path
+        // if not running from this module, redirect to the standard ReportGenerate handler
+        if (!str_contains($this->report, $coreWebtreesCustomizationDir)) {
+            parent::{__FUNCTION__}($attrs); // Call the parent method and
+            return;
+        }
+        
         $id    = '';
         $match = [];
         if (empty($attrs['id'])) {
@@ -415,6 +424,15 @@ class MitalteliReportParserGenerate_2_0 extends ReportParserGenerate
      */
     protected function gedcomValueStartHandler(array $attrs): void
     {
+        $coreWebtreesCustomizationDir = ResearchTasksReportModule::getCoreWebtreesCustomizationDirectory();
+
+        // Check if the report string contains the module directory path
+        // if not running from this module, redirect to the standard ReportGenerate handler
+        if (!str_contains($this->report, $coreWebtreesCustomizationDir)) {
+            parent::{__FUNCTION__}($attrs); // Call the parent method and
+            return;
+        }
+        
         $id    = '';
         $match = [];
         if (preg_match('/0 @(.+)@/', $this->getFromParentPrivatePropertyWithReflection('gedrec'), $match)) {
@@ -514,6 +532,15 @@ class MitalteliReportParserGenerate_2_0 extends ReportParserGenerate
      */
     protected function varStartHandler(array $attrs): void
     {
+        $coreWebtreesCustomizationDir = ResearchTasksReportModule::getCoreWebtreesCustomizationDirectory();
+
+        // Check if the report string contains the module directory path
+        // if not running from this module, redirect to the standard ReportGenerate handler
+        if (!str_contains($this->report, $coreWebtreesCustomizationDir)) {
+            parent::{__FUNCTION__}($attrs); // Call the parent method and
+            return;
+        }
+
         if (!isset($attrs['var'])) {
             $parser_parent = $this->getFromParentPrivatePropertyWithReflection('parser');
             throw new DomainException('REPORT ERROR var: The attribute "var=" is missing or not set in the XML file on line: ' . xml_get_current_line_number($parser_parent));
@@ -576,6 +603,15 @@ class MitalteliReportParserGenerate_2_0 extends ReportParserGenerate
      */
     protected function setVarStartHandler(array $attrs): void
     {
+        $coreWebtreesCustomizationDir = ResearchTasksReportModule::getCoreWebtreesCustomizationDirectory();
+
+        // Check if the report string contains the module directory path
+        // if not running from this module, redirect to the standard ReportGenerate handler
+        if (!str_contains($this->report, $coreWebtreesCustomizationDir)) {
+            parent::{__FUNCTION__}($attrs); // Call the parent method and
+            return;
+        }
+        
         if (empty($attrs['name'])) {
             throw new DomainException('REPORT ERROR var: The attribute "name" is missing or not set in the XML file');
         }
@@ -667,6 +703,14 @@ class MitalteliReportParserGenerate_2_0 extends ReportParserGenerate
      */
     protected function listStartHandler(array $attrs): void
     {
+        $coreWebtreesCustomizationDir = ResearchTasksReportModule::getCoreWebtreesCustomizationDirectory();
+
+        // Check if the report string contains the module directory path
+        // if not running from this module, redirect to the standard ReportGenerate handler
+        if (!str_contains($this->report, $coreWebtreesCustomizationDir)) {
+            parent::{__FUNCTION__}($attrs); // Call the parent method and
+            return;
+        }
 
         /////////////////////////////////////////////////////////////////////////////////////////////////////////
         //                                                                                                     //
@@ -1215,11 +1259,12 @@ class MitalteliReportParserGenerate_2_0 extends ReportParserGenerate
      * @param string $tag The GEDCOM tag to search within (e.g., '_TODO')
      * @param string $val The value string containing parameters for the filter
      *
-     * @return array{SEARCH:string,REPLACE:string,REMOVE:bool,HAYSTACK_WANT_R:string,NEEDLE:string}
+     * @return array{SEARCH:string,REPLACE:string,REMOVE:bool,HAYSTACK_WANT_R:string,NEEDLE:string} or null if NEEDLE is missing
+     * (should be returned an array and only be null if NEEDLE is missing because it means the user is not asking that kind of filter)
      *
      * @throws DomainException if the NEEDLE argument is missing
      */
-    public function searchReplaceStringsFromContainsRegexString(string $tag, string $val): array
+    public function searchReplaceStringsFromContainsRegexString(string $tag, string $val): ?array
     {
         // Example usage:
         // filter4="_TODO CONTAINS_R NEEDLE='$filter_rt' HAYSTACK_WANT_R='2 CONT|2 NOTE|3 CONT' HAYSTACK_DONT_WANT_R='2 DATE|2 _WT_USER' REPEAT_W_DW_R=3 HAYSTACK_REPLACE_R='\1\2\3' REMOVE_WANT_IN_HAYSTACK=1"
@@ -1232,8 +1277,12 @@ class MitalteliReportParserGenerate_2_0 extends ReportParserGenerate
 
         $args = $this->parseKeyValueString($val);
 
-        if (!isset($args['NEEDLE'])) {
+        if (!array_key_exists('NEEDLE', $args)) {
             throw new DomainException('CONTAINS_R requires a NEEDLE argument');
+        }
+
+        if (!isset($args['NEEDLE'])) {
+            return null;
         }
 
         if (!isset($args['HAYSTACK_WANT_R'])) {
@@ -1360,6 +1409,10 @@ class MitalteliReportParserGenerate_2_0 extends ReportParserGenerate
                                 break;
                             case 'CONTAINS_R':
                                 $strings = $this->searchReplaceStringsFromContainsRegexString($tag, $val);
+
+                                if ($strings === null) {
+                                    break;
+                                }
 
                                 $filters2[] = [
                                     'tag'  => $tag,
@@ -1500,6 +1553,15 @@ class MitalteliReportParserGenerate_2_0 extends ReportParserGenerate
      */
     protected function repeatTagStartHandler(array $attrs): void
     {
+        $coreWebtreesCustomizationDir = ResearchTasksReportModule::getCoreWebtreesCustomizationDirectory();
+
+        // Check if the report string contains the module directory path
+        // if not running from this module, redirect to the standard ReportGenerate handler
+        if (!str_contains($this->report, $coreWebtreesCustomizationDir)) {
+            parent::{__FUNCTION__}($attrs); // Call the parent method and
+            return;
+        }
+
         $this->setToParentPrivatePropertyWithReflection('process_repeats', $this->getFromParentPrivatePropertyWithReflection('process_repeats') + 1);
         if ($this->getFromParentPrivatePropertyWithReflection('process_repeats') > 1) {
             return;

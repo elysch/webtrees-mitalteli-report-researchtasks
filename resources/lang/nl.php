@@ -9,8 +9,7 @@
     'Report' => 'Raport', // Http/RequestHandlers/MitalteliReportGenerate.php
     'Private' => 'Privé', // app/Report/MitalteliReportParserGenerate.php
     '…' => '…', // app/Report/MitalteliReportParserGenerate.php
-    'Family Research Tasks Report' => 'Onderzoekstakenrapport voor gezinnen', // mitalteli-report-researchtasks/resources/report.xml
-    'Research tasks Report with filters and other options' => 'Onderzoekstakenrapport met filters en andere opties', // mitalteli-report-researchtasks/resources/report.xml
+    'Research tasks report with filters and other options' => 'Onderzoekstakenrapport met filters en andere opties', // mitalteli-report-researchtasks/resources/report.xml
     'Show parents' => 'Toon ouders', // mitalteli-report-researchtasks/resources/report.xml
     'Show XREF' => 'Toon XREF', // mitalteli-report-researchtasks/resources/report.xml
     'Show Filters' => 'Toon filters', // mitalteli-report-researchtasks/resources/report.xml

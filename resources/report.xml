@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 <Report>
-    <Title><var var="I18N::translate('Family Research Tasks Report')" /></Title>
-    <Description><var var="I18N::translate('Research tasks Report with filters and other options')" /></Description>
+    <Title><var var="I18N::translate('Research tasks report')" /></Title> <!-- MUST BE THE SAME AS ResearchTasksReportModule::REPORT_TITLE -->
+    <Description><var var="I18N::translate('Research tasks report with filters and other options')" /></Description>
 
     <!--SetVar name="showAllFamilies" value="" /-->
     <SetVar name="showAllFamilies" value="on" />
@@ -107,7 +107,7 @@
         <!-- Sevtor Reports ignores the header when the output is PDF -->
         <Header   comment="only used for html output" >
             <Textbox newline="1" pos="rel">
-                <Text style="header"><var var="I18N::translate('Research tasks Report')" /></Text>
+                <Text style="header"><var var="I18N::translate('Research tasks report')" /></Text> <!-- MUST BE THE SAME AS ResearchTasksReportModule::REPORT_TITLE -->
             </Textbox>
             <Cell align="rightrtl" newline="1" style="pagenum"><var var="I18N::translate('Page')" /> <PageNum /> <var var="I18N::translate('of')" /> <TotalPages /></Cell>
         </Header>

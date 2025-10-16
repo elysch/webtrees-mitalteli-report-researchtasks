@@ -19,6 +19,8 @@ declare(strict_types=1);
 
 namespace vendor\WebtreesModules\mitalteli\ResearchTasksReportNamespace\Report;
 
+use vendor\WebtreesModules\mitalteli\ResearchTasksReportNamespace\ResearchTasksReportModule;
+
 use Fisharebest\Webtrees\Report\PdfRenderer;
 use Fisharebest\Webtrees\Report\ReportBaseElement;
 use Fisharebest\Webtrees\Report\ReportPdfCell;
@@ -55,6 +57,13 @@ class MitalteliPdfRenderer_2_1 extends PdfRenderer
      */
     public function setup(): void
     {
+        // Check if the report string contains the module directory path
+        // if not running from this module, redirect to the standard ReportGenerate handler
+        if (!str_contains($this->title, ResearchTasksReportModule::REPORT_TITLE)) {
+            parent::{__FUNCTION__}(); // Call the parent method and
+            return;
+        }
+
         parent::setup();
 
         $this->tcpdf = new MitalteliTcpdfWrapper(

@@ -24,6 +24,7 @@ use vendor\WebtreesModules\mitalteli\ResearchTasksReportNamespace\Report\Mitalte
 use vendor\WebtreesModules\mitalteli\ResearchTasksReportNamespace\Report\MitalteliPdfRenderer_2_1;
 use Fisharebest\Webtrees\Http\RequestHandlers\ReportGenerate;
 use Fisharebest\Webtrees\Http\RequestHandlers\ReportListPage;
+use vendor\WebtreesModules\mitalteli\ResearchTasksReportNamespace\ResearchTasksReportModule;
 
 
 use Fig\Http\Message\StatusCodeInterface;
@@ -68,6 +69,14 @@ class MitalteliReportGenerate_2_1 extends ReportGenerate
         $user   = Validator::attributes($request)->user();
         $report = Validator::attributes($request)->string('report');
         $module = $this->getFromParentPrivatePropertyWithReflection('module_service')->findByName($report);
+
+        $coreWebtreesCustomizationDir = ResearchTasksReportModule::getCoreWebtreesCustomizationDirectory();
+
+        // Check if the report string contains the module directory path
+        // if not running from this module, redirect to the standard ReportGenerate handler
+        if (!str_contains($report, $coreWebtreesCustomizationDir)) {
+            return parent::{__FUNCTION__}($request);
+        }
 
         if (!$module instanceof ModuleReportInterface) {
             return redirect(route(ReportListPage::class, ['tree' => $tree->name()]));

@@ -19,6 +19,7 @@ declare(strict_types=1);
 
 namespace vendor\WebtreesModules\mitalteli\ResearchTasksReportNamespace\Report;
 
+use vendor\WebtreesModules\mitalteli\ResearchTasksReportNamespace\ResearchTasksReportModule;
 use Fisharebest\Webtrees\Report\HtmlRenderer;
 
 use Fisharebest\Webtrees\I18N;
@@ -66,6 +67,13 @@ class MitalteliHtmlRenderer extends HtmlRenderer
      */
     public function write(string $text, string $color = '', bool $useclass = true): void
     {
+        // Check if the report string contains the module directory path
+        // if not running from this module, redirect to the standard ReportGenerate handler
+        if (!str_contains($this->title, ResearchTasksReportModule::REPORT_TITLE)) {
+            parent::{__FUNCTION__}($text, $color, $useclass); // Call the parent method and
+            return;
+        }
+
         $style    = $this->getStyle($this->getCurrentStyle());
         $htmlcode = '<span dir="' . I18N::direction() . '"';
         if ($useclass) {

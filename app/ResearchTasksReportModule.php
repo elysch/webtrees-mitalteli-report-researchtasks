@@ -37,6 +37,9 @@ class ResearchTasksReportModule extends AbstractModule implements ModuleCustomIn
     public const AUTHOR_WEBSITE = 'https://github.com/elysch/webtrees-mitalteli-report-researchtasks/';
     public const CUSTOM_SUPPORT_URL = self::AUTHOR_WEBSITE . 'issues';
 
+    /* The report title must be exactly the same as in resources/report.xml in two places at least*/
+    public const REPORT_TITLE = 'Research tasks report';
+    
     /**
      *
      * @param ModuleService $module_service
@@ -58,12 +61,28 @@ class ResearchTasksReportModule extends AbstractModule implements ModuleCustomIn
     }
 
     /**
+     * Get the directory name of this module.
+     *
+     * @return string
+     */
+    public static function getCoreWebtreesCustomizationDirectory(): string
+    {
+        # __DIR__ returns the directory of this file, which is like /path/to/webtrees/modules_v4/mitalteli-report-researchtasks/app
+        $real_dir = realpath(__DIR__ . DIRECTORY_SEPARATOR . '..' . DIRECTORY_SEPARATOR);
+        if ($real_dir === false) {
+            throw new \RuntimeException('Could not resolve the parent directory of ' . __DIR__);
+        }
+        #return basename(dirname($real_dir));
+        return basename($real_dir);
+    }
+
+    /**
      * @return string
      */
     public function title(): string
     {
         /* I18N: Name of a module/report */
-        return I18N::translate('Research tasks report');
+        return I18N::translate(ResearchTasksReportModule::REPORT_TITLE);
     }
 
     /**
