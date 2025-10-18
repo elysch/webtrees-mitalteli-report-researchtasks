@@ -17,7 +17,7 @@ spl_autoload_register(function ($class) {
         $base_NS_len=strlen(__NAMESPACE__)+1;
         $classTmp=substr($class, $base_NS_len);
         $name = dirname(__FILE__) . "/app/" . str_replace('\\', '/',$classTmp) . '.php';
-        error_log("AUTOLOAD CLASS: class:[$class], len:[$base_NS_len], file:[$name]");
+        #error_log("AUTOLOAD CLASS: class:[$class], len:[$base_NS_len], file:[$name]");
         include $name;
     }
 }, true, true);  
