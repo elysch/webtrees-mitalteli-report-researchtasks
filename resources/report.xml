@@ -39,7 +39,12 @@
                         'required' => true,
                     ]); ?>
 -->
+    
     <Input name="filter_rt" type="text" default=""><var var="I18N::translate('Research Task Filter')" /></Input>
+    <Input name="filter_rt_whole_word" type="checkbox" default="0"><var var="I18N::translate('Filter whole word only')" /></Input>
+    <Input name="filter_rt_ignore_case" type="checkbox" default="1"><var var="I18N::translate('Filter case insensitive')" /></Input>
+    <Input name="filter_rt_remove_diacritics" type="checkbox" default="1"><var var="I18N::translate('Filter removing diacritics')" /></Input>
+
     <Input name="date1" lookup="DATE" type="text"><var var="I18N::translate('Research task creation date range start')" /></Input>
     <Input name="date2" lookup="DATE" type="text"><var var="I18N::translate('Research task creation date range end')" /></Input>
 
@@ -187,7 +192,7 @@
                 </if>
 
                 <!-- THERE CAN BE MORE THAN ONE _TODO ENTRY -->
-                <RepeatTag tag="_TODO" filter5="$hideEmptyDatesFilter" filter4="_TODO CONTAINS_R NEEDLE='$filter_rt' HAYSTACK_WANT_R='2 CONT|2 NOTE|3 CONT' HAYSTACK_DONT_WANT_R='2 DATE|2 _WT_USER' REPEAT_W_DW_R=3 HAYSTACK_REPLACE_R='\1\2\3' REMOVE_WANT_IN_HAYSTACK=1" filter2="_TODO:DATE GTE $date1" filter3="_TODO:DATE LTE $date2">
+                <RepeatTag tag="_TODO" filter5="$hideEmptyDatesFilter" filter4="_TODO CONTAINS_R NEEDLE='$filter_rt' NEEDLE_OP_WHOLE_WORD='$filter_rt_whole_word' NEEDLE_OP_IGNORE_CASE='$filter_rt_ignore_case' NEEDLE_OP_REMOVE_DIACRITICS='$filter_rt_remove_diacritics' HAYSTACK_WANT_R='2 CONT|2 NOTE|3 CONT' HAYSTACK_DONT_WANT_R='2 DATE|2 _WT_USER' REPEAT_W_DW_R=3 HAYSTACK_REPLACE_R='\1\2\3' HAYSTACK_REMOVE_WANT=1" filter2="_TODO:DATE GTE $date1" filter3="_TODO:DATE LTE $date2">
 
                     <!-- XREF -->
                     <if condition="$showXref=='on'">
@@ -270,7 +275,7 @@
                 <GetPersonName id="" setvar="Name"/>
 
                 <!-- THERE CAN BE MORE THAN ONE _TODO ENTRY -->
-                <RepeatTag tag="_TODO" filter5="$hideEmptyDatesFilter" filter4="_TODO CONTAINS_R NEEDLE='$filter_rt' HAYSTACK_WANT_R='2 CONT|2 NOTE|3 CONT' HAYSTACK_DONT_WANT_R='2 DATE|2 _WT_USER' REPEAT_W_DW_R=3 HAYSTACK_REPLACE_R='\1\2\3' REMOVE_WANT_IN_HAYSTACK=1" filter2="_TODO:DATE GTE $date1" filter3="_TODO:DATE LTE $date2">
+                <RepeatTag tag="_TODO" filter5="$hideEmptyDatesFilter" filter4="_TODO CONTAINS_R NEEDLE='$filter_rt' HAYSTACK_WANT_R='2 CONT|2 NOTE|3 CONT' HAYSTACK_DONT_WANT_R='2 DATE|2 _WT_USER' REPEAT_W_DW_R=3 HAYSTACK_REPLACE_R='\1\2\3' HAYSTACK_REMOVE_WANT=1" filter2="_TODO:DATE GTE $date1" filter3="_TODO:DATE LTE $date2">
 
                     <!-- XREF -->
                     <if condition="$showXref=='on'">

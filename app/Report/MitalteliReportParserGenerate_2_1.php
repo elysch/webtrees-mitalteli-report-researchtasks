@@ -83,6 +83,21 @@ class MitalteliReportParserGenerate_2_1 extends ReportParserGenerate
 
     private $tag_url;
 
+    private $repeats_rec_filtered_out = 0;
+
+    #USE AN OPTIONS ARRAY CONSTANT TO MAKE SURE THE OPTIONS ARE WRITTEN CORRECTLY
+    private const CONTAINS_R_OP = [
+        'NEEDLE'                      => [ "KEY" => "n"    ],
+        'NEEDLE_OP_WHOLE_WORD'        => [ "KEY" => "nww"  ],
+        'NEEDLE_OP_IGNORE_CASE'       => [ "KEY" => "nic"  ],
+        'NEEDLE_OP_REMOVE_DIACRITICS' => [ "KEY" => "nrd"  ],
+        'HAYSTACK_REPLACE_R'          => [ "KEY" => "hrr"  ],
+        'HAYSTACK_WANT_R'             => [ "KEY" => "hwr"  ],
+        'HAYSTACK_DONT_WANT_R'        => [ "KEY" => "hdwr" ],
+        'HAYSTACK_REMOVE_WANT'        => [ "KEY" => "hrw"  ],     
+        'REPEAT_W_DW_R'               => [ "KEY" => "hrn"  ],
+        'searchstr'                   => [ "KEY" => "sstr" ],
+    ];
 
     /**
      * Get the value of a private property from the parent class using reflection
@@ -1028,6 +1043,7 @@ class MitalteliReportParserGenerate_2_1 extends ReportParserGenerate
                             } else {
                                 $date2 = $fact2->date();
                             }
+
                         } else {
                             #VALIDATE IF STILL WORKS IN THIS CASE
                             $fact1 = $x->facts([])->first();
@@ -1116,8 +1132,8 @@ class MitalteliReportParserGenerate_2_1 extends ReportParserGenerate
                 // unsorted or already sorted by SQL
                 break;
 
-                $this->setToParentPrivatePropertyWithReflection('list', $list_parent);
         }
+        $this->setToParentPrivatePropertyWithReflection('list', $list_parent);
 
         $repeats_stack_parent = $this->getFromParentPrivatePropertyWithReflection('repeats_stack');
         $repeats_stack_parent[] = [
@@ -1139,8 +1155,55 @@ class MitalteliReportParserGenerate_2_1 extends ReportParserGenerate
     protected function listTotalResetStartHandler(): void
     {
         $this->setToParentPrivatePropertyWithReflection('list_total', 0);
+        $this->repeats_rec_filtered_out = '0';
     }
 
+    /**
+     * Handle <listTotal>
+     * Prints the total number of records in a list
+     * The total number is collected from <list> and <relatives>
+     *
+     * @return void
+     */
+    protected function listTotalStartHandler(): void
+    {
+        $coreWebtreesCustomizationDir = ResearchTasksReportModule::getCoreWebtreesCustomizationDirectory();
+
+        // Check if the report string contains the module directory path
+        // if not running from this module, redirect to the standard ReportGenerate handler
+        if (!str_contains($this->report, $coreWebtreesCustomizationDir)) {
+            parent::{__FUNCTION__}(); // Call the parent method and
+            return;
+        }
+
+        if ($this->repeats_rec_filtered_out == 0) {
+            parent::{__FUNCTION__}(); // Call the parent method
+        } else {
+            if ($this->repeats_rec_filtered_out > $this->getFromParentPrivatePropertyWithReflection('list_total')) {
+                // Adjust the list total by subtracting the number of filtered out records
+                // In theory thish should not happen, but just in case
+                $this->repeats_rec_filtered_out = $this->getFromParentPrivatePropertyWithReflection('list_total');
+            }
+            if ($this->getFromParentPrivatePropertyWithReflection('list_private') == 0) {
+                $this->getFromParentPrivatePropertyWithReflection('current_element')->addText((string) ($this->getFromParentPrivatePropertyWithReflection('list_total') - $this->repeats_rec_filtered_out));
+            } else {
+                $this->getFromParentPrivatePropertyWithReflection('current_element')->addText((($this->getFromParentPrivatePropertyWithReflection('list_total') - $this->repeats_rec_filtered_out) - $this->getFromParentPrivatePropertyWithReflection('list_private')) . ' / ' . ($this->getFromParentPrivatePropertyWithReflection('list_total') - $this->repeats_rec_filtered_out));
+            }
+        }
+    }
+
+    public function removeDiacritics(string $text): string
+    {
+        $normalized = \Normalizer::normalize($text, \Normalizer::FORM_D);
+        $withoutDiacritics = preg_replace('/\p{Mn}/u', '', $normalized);
+
+        return $withoutDiacritics ?: $text;
+
+        #Annother approach using Transliterator
+        #$transliterator = \Transliterator::createFromRules(':: Any-Latin; :: Latin-ASCII; :: NFD; :: [:Nonspacing Mark:] Remove; :: Lower(); :: NFC;', Transliterator::FORWARD);
+        #return $transliterator->transliterate($string);
+    }
+    
     /**
      * Convert a string representation of a boolean to a boolean
      *
@@ -1155,7 +1218,7 @@ class MitalteliReportParserGenerate_2_1 extends ReportParserGenerate
      *
      * @throws InvalidArgumentException if the input string is not a valid boolean representation
      */
-    public function convertValueToBool(string $value): bool
+    public function convertValueToBool(?string $value): bool
     {
         $trueValues  = ['1', 'true', 'yes', 'on'];
         $falseValues = ['0', 'false', 'no', 'off'];
@@ -1228,8 +1291,9 @@ class MitalteliReportParserGenerate_2_1 extends ReportParserGenerate
     public function searchReplaceStringsFromContainsRegexString(string $tag, string $val): ?array
     {
         // Example usage:
-        // filter4="_TODO CONTAINS_R NEEDLE='$filter_rt' HAYSTACK_WANT_R='2 CONT|2 NOTE|3 CONT' HAYSTACK_DONT_WANT_R='2 DATE|2 _WT_USER' REPEAT_W_DW_R=3 HAYSTACK_REPLACE_R='\1\2\3' REMOVE_WANT_IN_HAYSTACK=1"
-        // filter4="_TODO:NOTE CONTAINS_R NEEDLE='$filter_rt' HAYSTACK_WANT_R='3 CONT' REMOVE_WANT_IN_HAYSTACK=1"
+        // filter4="_TODO CONTAINS_R NEEDLE='$filter_rt' NEEDLE_OP_WHOLE_WORD='$filter_rt_whole_word' NEEDLE_OP_IGNORE_CASE='$filter_rt_ignore_case' NEEDLE_OP_REMOVE_DIACRITICS='$filter_rt_remove_diacritics' HAYSTACK_WANT_R='2 CONT|2 NOTE|3 CONT' HAYSTACK_DONT_WANT_R='2 DATE|2 _WT_USER' REPEAT_W_DW_R=3 HAYSTACK_REPLACE_R='\1\2\3' HAYSTACK_REMOVE_WANT=1"
+        // filter4="_TODO CONTAINS_R NEEDLE='$filter_rt' HAYSTACK_WANT_R='2 CONT|2 NOTE|3 CONT' HAYSTACK_DONT_WANT_R='2 DATE|2 _WT_USER' REPEAT_W_DW_R=3 HAYSTACK_REPLACE_R='\1\2\3' HAYSTACK_REMOVE_WANT=1"
+        // filter4="_TODO:NOTE CONTAINS_R NEEDLE='$filter_rt' HAYSTACK_WANT_R='3 CONT' HAYSTACK_REMOVE_WANT=1"
 
         #REGEX TO GET ALL TEXT VALUES FROM _TODO: /((?:\n((?:1 _TODO|2 CONT|2 NOTE|3 CONT) ?).*)*)(?:(?:\n(?:2 DATE|2 _WT_USER) ?.*)*)((?:\n((?:1 _TODO|2 CONT|2 NOTE|3 CONT) ?).*)*)(?:(?:\n(?:2 DATE|2 _WT_USER) ?.*)*)((?:\n((?:1 _TODO|2 CONT|2 NOTE|3 CONT) ?).*)*)/
         #THE RESULT IS IN \1\2\3
@@ -1277,14 +1341,18 @@ class MitalteliReportParserGenerate_2_1 extends ReportParserGenerate
             $searchstr .= $searchWant . $searchDontwant;
         }
 
-        return [
-            'SEARCH' => $searchstr,
-            'REPLACE' => $args['HAYSTACK_REPLACE_R'] ?? '\0',
-            'REMOVE' => $this->convertValueToBool($args['REMOVE_WANT_IN_HAYSTACK']),
-            'REMOVE' => !empty($args['REMOVE_WANT_IN_HAYSTACK']) ?? false,
-            'HAYSTACK_WANT_R' => $args['HAYSTACK_WANT_R'],
-            'NEEDLE' => $args['NEEDLE'],
-        ];
+        #USE AN OPTIONS ARRAY CONSTANT TO MAKE SURE THE OPTIONS ARE WRITTEN CORRECTLY
+        $op = [];
+        $op[self::CONTAINS_R_OP["searchstr"]["KEY"]] = $searchstr;
+        $op[self::CONTAINS_R_OP["HAYSTACK_REPLACE_R"]["KEY"]] = $args['HAYSTACK_REPLACE_R'] ?? '\0';
+        $op[self::CONTAINS_R_OP["HAYSTACK_WANT_R"]["KEY"]] = $args['HAYSTACK_WANT_R'];
+        $op[self::CONTAINS_R_OP["HAYSTACK_REMOVE_WANT"]["KEY"]] = $this->convertValueToBool($args['HAYSTACK_REMOVE_WANT'] ?? null);
+        $op[self::CONTAINS_R_OP["NEEDLE"]["KEY"]] = $args['NEEDLE'];
+        $op[self::CONTAINS_R_OP["NEEDLE_OP_WHOLE_WORD"]["KEY"]] = $this->convertValueToBool($args['NEEDLE_OP_WHOLE_WORD'] ?? null );
+        $op[self::CONTAINS_R_OP["NEEDLE_OP_IGNORE_CASE"]["KEY"]] = $this->convertValueToBool($args['NEEDLE_OP_IGNORE_CASE'] ?? null);
+        $op[self::CONTAINS_R_OP["NEEDLE_OP_REMOVE_DIACRITICS"]["KEY"]] = $this->convertValueToBool($args['NEEDLE_OP_REMOVE_DIACRITICS'] ?? null);
+
+        return $op;
     }
 
     /**
@@ -1327,7 +1395,7 @@ class MitalteliReportParserGenerate_2_1 extends ReportParserGenerate
                     $tag  = trim($match["tag"]);
                     $expr = trim($match["expr"]);
                     $val  = trim($match["val"]);
-                    if (preg_match("/\\$(\w+)/", $val, $match)) {
+                    while (preg_match("/\\$(\w+)/", $val, $match)) {
                         $vars_parent = $this->getFromParentPrivatePropertyWithReflection('vars');
                         //-- Replace all occurrences of $var in the value with the actual value from the vars array with word boundary anchors (\b) in order to prevent middle-word replacements
                         //-- It also uses unicode mode (/u) to handle UTF-8 characters correctly
@@ -1376,12 +1444,15 @@ class MitalteliReportParserGenerate_2_1 extends ReportParserGenerate
                                 }
 
                                 $filters2[] = [
-                                    'tag'  => $tag,
-                                    'searchstr' => $strings['SEARCH'],
-                                    'replacestr'  => $strings['REPLACE'],
-                                    'remove' => $strings['REMOVE'],
-                                    'want_regex' => $strings['HAYSTACK_WANT_R'],
-                                    'needlestr'  => $strings['NEEDLE'],
+                                    'tag'                      => $tag,
+                                    'searchstr'                => $strings[self::CONTAINS_R_OP["searchstr"]["KEY"]],
+                                    'replacestr'               => $strings[self::CONTAINS_R_OP["HAYSTACK_REPLACE_R"]["KEY"]],
+                                    'remove'                   => $strings[self::CONTAINS_R_OP["HAYSTACK_REMOVE_WANT"]["KEY"]],
+                                    'want_regex'               => $strings[self::CONTAINS_R_OP["HAYSTACK_WANT_R"]["KEY"]],
+                                    'needlestr'                => $strings[self::CONTAINS_R_OP["NEEDLE"]["KEY"]],
+                                    'needle_wholeword'         => $strings[self::CONTAINS_R_OP["NEEDLE_OP_WHOLE_WORD"]["KEY"]],
+                                    'needle_ignorecase'        => $strings[self::CONTAINS_R_OP["NEEDLE_OP_IGNORE_CASE"]["KEY"]],
+                                    'needle_removediacritics'  => $strings[self::CONTAINS_R_OP["NEEDLE_OP_REMOVE_DIACRITICS"]["KEY"]],
                                 ];
                                 break;
                             default:
@@ -1399,10 +1470,10 @@ class MitalteliReportParserGenerate_2_1 extends ReportParserGenerate
     }
 
     /**
-     * Apply the filters that cannot be applied using SQL
-     *
-     * @param string $grec    The gedcom record to apply the filters to
-     * @param array<string,array{tag:string,expr?:string,val?:string,searchstr?:string,replacestr?:string,remove?:bool,want_regex?:string,needlestr?:string}> $filters2 The filters to apply
+     * Apply fact filters to a gedcom record that cannot be applied using SQL
+
+     * @param string $grec    The gedcom record to filter
+     * @param array{tag:string,expr?:string,val?:string,searchstr?:string,replacestr?:string,remove?:bool,want_regex?:string,needlestr?:string,needle_wholeword?:bool,needle_ignorecase?:,needle_removediacritics?:bool} $filters2 The filters to apply
      *
      * @return bool true if the record passes all filters, false otherwise
      */
@@ -1477,6 +1548,9 @@ class MitalteliReportParserGenerate_2_1 extends ReportParserGenerate
                     $remove      = $filter['remove'];
                     $want_regex  = $filter['want_regex'];
                     $needlestr   = $filter['needlestr'];
+                    $needle_ww   = $filter['needle_wholeword'];
+                    $needle_ic   = $filter['needle_ignorecase'];
+                    $needle_rd   = $filter['needle_removediacritics'];
 
                     $haystack = "\n" . $grec;
 
@@ -1488,9 +1562,34 @@ class MitalteliReportParserGenerate_2_1 extends ReportParserGenerate
                         $haystack = preg_replace("/" . $regex . "/", "\n", $haystack);
                     }
 
+                    //-- Prepare the search. Remove diacritics if requested, both from haystack and needle
+                    if ($needle_rd) {
+                        $haystack = $this->removeDiacritics($haystack);
+                        $needlestr = $this->removeDiacritics($needlestr);
+                    }
+
+                    //-- Prepare the search. Escape special regex characters in needle and "/" delimiter
+                    $needlestr = preg_quote($needlestr, '/');
+
+                    //-- Prepare the search. Add word boundary anchors if requested
+                    if ($needle_ww) {
+                        $needlestr = '\b' . $needlestr . '\b';
+                    }
+
+                    //-- Prepare the search. Ignore case if requested
+                    if ($needle_ic) {
+                        $needlestr = '(?i)' . $needlestr;
+                    }
+
+                    //-- Prepare the search. Allow for extra spaces
+                    $needlestr = str_replace(' ', '\s*', $needlestr);
+                    
+                    //-- Prepare the search. Remove new lines from haystack
+                    $haystack = preg_replace('/\n/', " ", $haystack);
+
+
                     //-- Check if the needle exists in the haystack
-                    #if (!preg_match('/' . preg_quote($needlestr, '/') . '/i', $haystack)) {
-                    if (!preg_match('/' . $needlestr . '/i', $haystack)) {
+                    if (!preg_match('/' . $needlestr . '/', $haystack)) {
                         $keep = false;
                         continue;
                     }
@@ -1573,7 +1672,10 @@ class MitalteliReportParserGenerate_2_1 extends ReportParserGenerate
                 $level--;
                 $count = preg_match_all("/$level $t(.*)/", $subrec, $match, PREG_SET_ORDER);
                 $i     = 0;
+                $do_filter = false;
                 while ($i < $count) {
+                    $do_filter = true;
+                    $kept_todo = false;
                     $i++;
                     // Privacy check - is this a link, and are we allowed to view the linked object?
                     $subrecord = self::getSubRecord($level, "$level $t", $subrec, $i);
@@ -1602,15 +1704,17 @@ class MitalteliReportParserGenerate_2_1 extends ReportParserGenerate
                     if ($keep) {
                         if ($filters2 !== []) {
                             $keep = $this->applyFactFilters($subrecord, $filters2);
-                            if ($keep) {
-                                $repeats[] = $subrecord;
-                            }
-                        } else {
-                            $repeats[] = $subrecord;
                         }
+                    }
+                    if ($keep) {
+                        $repeats[] = $subrecord;
+                        $kept_todo = true;
                     }
 
                     $this->setToParentPrivatePropertyWithReflection('repeats', $repeats);
+                }
+                if ($do_filter && (!$kept_todo)) {
+                    $this->repeats_rec_filtered_out++;
                 }
             }
         }
