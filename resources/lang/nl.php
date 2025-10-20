@@ -17,9 +17,9 @@
     'Show all individuals' => 'Toon alle personen', // mitalteli-report-researchtasks/resources/report.xml
     'Show all families' => 'Toon alle gezinnen', // mitalteli-report-researchtasks/resources/report.xml
     'Research Task Filter' => 'Onderzoekstaakfilter', // mitalteli-report-researchtasks/resources/report.xml
-    'Match whole string' => 'Overeenkomen met de hele reeks', // mitalteli-report-researchtasks/resources/report.xml
-    'Match ignoring case' => 'Match zonder rekening te houden met hoofdlettergebruik', // mitalteli-report-researchtasks/resources/report.xml
-    'Match ignoring diacritics' => 'Match negeert diakritische tekens', // mitalteli-report-researchtasks/resources/report.xml
+    'Match whole string' => 'Exacte overeenkomst', // mitalteli-report-researchtasks/resources/report.xml
+    'Match ignoring case' => 'Negeer hoofdlettergevoeligheid', // mitalteli-report-researchtasks/resources/report.xml
+    'Match ignoring diacritics' => 'Negeer diakritische tekens', // mitalteli-report-researchtasks/resources/report.xml
     'Research task creation date range start' => 'Begindatum onderzoekstaken', // mitalteli-report-researchtasks/resources/report.xml
     'Research task creation date range end' => 'Eindddatum onderzoekstaken', // mitalteli-report-researchtasks/resources/report.xml
     'sort by lastname' => 'sorteren op achternaam', // mitalteli-report-researchtasks/resources/report.xml
