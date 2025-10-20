@@ -2,13 +2,12 @@
 
     return [
 
-    'Research tasks report' => 'Onderzoekstakenrapport', // mitalteli-report-researchtasks/app/ResearchTasksReportModule.php
     'A research tasks Report with filters and other options.' => 'Een onderzoekstakenrapport met filters en andere opties.', // mitalteli-report-researchtasks/app/ResearchTasksReportModule.php
     'Individual' => 'Persoon', // mitalteli-report-researchtasks/app/ResearchTasksReportModule.php
-    'Family' => 'Gezin', // mitalteli-report-researchtasks/app/ResearchTasksReportModule.php
     'Report' => 'Raport', // Http/RequestHandlers/MitalteliReportGenerate.php
     'Private' => 'Privé', // app/Report/MitalteliReportParserGenerate.php
     '…' => '…', // app/Report/MitalteliReportParserGenerate.php
+    'Research tasks report' => 'Onderzoekstakenrapport', // mitalteli-report-researchtasks/app/ResearchTasksReportModule.php
     'Research tasks report with filters and other options' => 'Onderzoekstakenrapport met filters en andere opties', // mitalteli-report-researchtasks/resources/report.xml
     'Show parents' => 'Toon ouders', // mitalteli-report-researchtasks/resources/report.xml
     'Show XREF' => 'Toon XREF', // mitalteli-report-researchtasks/resources/report.xml
@@ -18,6 +17,9 @@
     'Show all individuals' => 'Toon alle personen', // mitalteli-report-researchtasks/resources/report.xml
     'Show all families' => 'Toon alle gezinnen', // mitalteli-report-researchtasks/resources/report.xml
     'Research Task Filter' => 'Onderzoekstaakfilter', // mitalteli-report-researchtasks/resources/report.xml
+    'Match whole string' => 'Overeenkomen met de hele reeks', // mitalteli-report-researchtasks/resources/report.xml
+    'Match ignoring case' => 'Match zonder rekening te houden met hoofdlettergebruik', // mitalteli-report-researchtasks/resources/report.xml
+    'Match ignoring diacritics' => 'Match negeert diakritische tekens', // mitalteli-report-researchtasks/resources/report.xml
     'Research task creation date range start' => 'Begindatum onderzoekstaken', // mitalteli-report-researchtasks/resources/report.xml
     'Research task creation date range end' => 'Eindddatum onderzoekstaken', // mitalteli-report-researchtasks/resources/report.xml
     'sort by lastname' => 'sorteren op achternaam', // mitalteli-report-researchtasks/resources/report.xml
@@ -42,8 +44,6 @@
     'Families' => 'Gezinnen', // mitalteli-report-researchtasks/resources/report.xml
     'Total families' => 'Totaal aantal gezinnen', // mitalteli-report-researchtasks/resources/report.xml
     'Report Parameters' => 'Rapportparameters', // mitalteli-report-researchtasks/resources/report.xml
-    'Research task created by (individual)' => 'Onderzoekstaak aangemaakt door (persoon)', // mitalteli-report-researchtasks/resources/report.xml
-    'Research task created by (family)' => 'Onderzoekstaak aangemaakt door (gezin)', // mitalteli-report-researchtasks/resources/report.xml
     'About sort: It takes the first fact of each individual or family to sort, ignores the rest and sends empty values to the end.' => 'Over sorteren: het neemt het eerste feit van elk persoon of elk gezin om te sorteren, negeert de rest en stuurt lege waarden naar het einde.', // mitalteli-report-researchtasks/resources/report.xml
 
     ];

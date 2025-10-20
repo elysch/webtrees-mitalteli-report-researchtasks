@@ -538,7 +538,7 @@ class MitalteliReportParserGenerate_2_0 extends ReportParserGenerate
      * @ desc GEDCOM fact description, example:
      *        1 EVEN This is a description
      * @ fact GEDCOM fact tag, such as BIRT, DEAT etc.
-     * $ I18N::translate('....')
+     * $ I18N::translate('...')
      * $ language_settings[]
      *
      * @param array<string> $attrs an array of key value pairs for the attributes

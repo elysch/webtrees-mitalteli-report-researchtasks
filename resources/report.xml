@@ -41,9 +41,9 @@
 -->
     
     <Input name="filter_rt" type="text" default=""><var var="I18N::translate('Research Task Filter')" /></Input>
-    <Input name="filter_rt_whole_word" type="checkbox" default="0"><var var="I18N::translate('Filter whole word only')" /></Input>
-    <Input name="filter_rt_ignore_case" type="checkbox" default="1"><var var="I18N::translate('Filter case insensitive')" /></Input>
-    <Input name="filter_rt_remove_diacritics" type="checkbox" default="1"><var var="I18N::translate('Filter removing diacritics')" /></Input>
+    <Input name="filter_rt_whole_word" type="checkbox" default="0"><var var="I18N::translate('Match whole string')" /></Input>
+    <Input name="filter_rt_ignore_case" type="checkbox" default="1"><var var="I18N::translate('Match ignoring case')" /></Input>
+    <Input name="filter_rt_remove_diacritics" type="checkbox" default="1"><var var="I18N::translate('Match ignoring diacritics')" /></Input>
 
     <Input name="date1" lookup="DATE" type="text"><var var="I18N::translate('Research task creation date range start')" /></Input>
     <Input name="date2" lookup="DATE" type="text"><var var="I18N::translate('Research task creation date range end')" /></Input>

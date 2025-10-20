@@ -2,13 +2,12 @@
 
     return [
 
-    'Research tasks report' => 'Reporte de Tareas de investigación', // mitalteli-report-researchtasks/app/ResearchTasksReportModule.php
     'A research tasks Report with filters and other options.' => 'Un reporte de Tareas de investigación con filtros y otras opciones.', // mitalteli-report-researchtasks/app/ResearchTasksReportModule.php
     'Individual' => 'Individuo', // mitalteli-report-researchtasks/app/ResearchTasksReportModule.php
-    'Family' => 'Familia', // mitalteli-report-researchtasks/app/ResearchTasksReportModule.php
     'Report' => 'Reporte', // Http/RequestHandlers/MitalteliReportGenerate.php
     'Private' => 'Privado', // app/Report/MitalteliReportParserGenerate.php
     '…' => '…', // app/Report/MitalteliReportParserGenerate.php
+    'Research tasks report' => 'Reporte de Tareas de investigación', // mitalteli-report-researchtasks/app/ResearchTasksReportModule.php
     'Research tasks report with filters and other options' => 'Reporte de Tareas de investigación con filtros y otras opciones', // mitalteli-report-researchtasks/resources/report.xml
     'Show parents' => 'Mostrar padres', // mitalteli-report-researchtasks/resources/report.xml
     'Show XREF' => 'Mostrar XREF', // mitalteli-report-researchtasks/resources/report.xml
@@ -18,6 +17,9 @@
     'Show all individuals' => 'Mostrar todos los individuos', // mitalteli-report-researchtasks/resources/report.xml
     'Show all families' => 'Mostrar todas las familias', // mitalteli-report-researchtasks/resources/report.xml
     'Research Task Filter' => 'Filtro de Tareas de investigación', // mitalteli-report-researchtasks/resources/report.xml
+    'Match whole string' => 'Coincidir cadena compleata', // mitalteli-report-researchtasks/resources/report.xml
+    'Match ignoring case' => 'Coincidir ignorando mayúsculas y minúsculas', // mitalteli-report-researchtasks/resources/report.xml
+    'Match ignoring diacritics' => 'Coincidir ignorando acentos', // mitalteli-report-researchtasks/resources/report.xml
     'Research task creation date range start' => 'Rango de fechas de creación: Inicio', // mitalteli-report-researchtasks/resources/report.xml
     'Research task creation date range end' => 'Rango de fechas de creación: Fin', // mitalteli-report-researchtasks/resources/report.xml
     'sort by lastname' => 'ordenar por apellido', // mitalteli-report-researchtasks/resources/report.xml
@@ -42,8 +44,6 @@
     'Families' => 'Familias', // mitalteli-report-researchtasks/resources/report.xml
     'Total families' => 'Total de familias', // mitalteli-report-researchtasks/resources/report.xml
     'Report Parameters' => 'Parámetros del reporte', // mitalteli-report-researchtasks/resources/report.xml
-    'Research task created by (individual)' => 'Tarea de investigación creada por (individuo)', // mitalteli-report-researchtasks/resources/report.xml
-    'Research task created by (family)' => 'Tarea de investigación creada por (familia)', // mitalteli-report-researchtasks/resources/report.xml
     'About sort: It takes the first fact of each individual or family to sort, ignores the rest and sends empty values to the end.' => 'Acerca del orden: Toma el primer hecho de cada individuo o familia para ordenar, ignora el resto y coloca los valores vacíos al final.', // mitalteli-report-researchtasks/resources/report.xml
 
     ];
