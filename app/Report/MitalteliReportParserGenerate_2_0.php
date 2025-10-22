@@ -1235,11 +1235,11 @@ class MitalteliReportParserGenerate_2_0 extends ReportParserGenerate
         $normalized = \Normalizer::normalize($text, \Normalizer::FORM_D);
         $withoutDiacritics = preg_replace('/\p{Mn}/u', '', $normalized);
 
-        return $withoutDiacritics ?: $text;
+        ##Annother approach using Transliterator
+        #$transliterator = \Transliterator::createFromRules(':: Any-Latin; :: Latin-ASCII; :: NFD; :: [:Nonspacing Mark:] Remove; :: Lower(); :: NFC;', \Transliterator::FORWARD);
+        #$withoutDiacritics = $transliterator->transliterate($text);
 
-        #Annother approach using Transliterator
-        #$transliterator = \Transliterator::createFromRules(':: Any-Latin; :: Latin-ASCII; :: NFD; :: [:Nonspacing Mark:] Remove; :: Lower(); :: NFC;', Transliterator::FORWARD);
-        #return $transliterator->transliterate($string);
+        return $withoutDiacritics ?: $text;
     }
     
     /**
@@ -1694,10 +1694,10 @@ class MitalteliReportParserGenerate_2_0 extends ReportParserGenerate
                     $t = $tags[$i];
                     if (!empty($t)) {
                         if ($i < ($count - 1)) {
-                            $subrec = self::getSubRecord($level, "$level $t", $subrec);
+                            $subrec = Functions::getSubRecord($level, "$level $t", $subrec);
                             if (empty($subrec)) {
                                 $level--;
-                                $subrec = self::getSubRecord($level, "@ $t", $this->getFromParentPrivatePropertyWithReflection('gedrec'));
+                                $subrec = Functions::getSubRecord($level, "@ $t", $this->getFromParentPrivatePropertyWithReflection('gedrec'));
                                 if (empty($subrec)) {
                                     return;
                                 }
@@ -1716,7 +1716,7 @@ class MitalteliReportParserGenerate_2_0 extends ReportParserGenerate
                     $kept_todo = false;
                     $i++;
                     // Privacy check - is this a link, and are we allowed to view the linked object?
-                    $subrecord = self::getSubRecord($level, "$level $t", $subrec, $i);
+                    $subrecord = Functions::getSubRecord($level, "$level $t", $subrec, $i);
                     if (preg_match('/^\d ' . Gedcom::REGEX_TAG . ' @(' . Gedcom::REGEX_XREF . ')@/', $subrecord, $xref_match)) {
                         $linked_object = Registry::gedcomRecordFactory()->make($xref_match[1], $this->getFromParentPrivatePropertyWithReflection('tree'));
                         if ($linked_object && !$linked_object->canShow()) {

@@ -1197,11 +1197,11 @@ class MitalteliReportParserGenerate_2_1 extends ReportParserGenerate
         $normalized = \Normalizer::normalize($text, \Normalizer::FORM_D);
         $withoutDiacritics = preg_replace('/\p{Mn}/u', '', $normalized);
 
-        return $withoutDiacritics ?: $text;
+        ##Annother approach using Transliterator
+        #$transliterator = \Transliterator::createFromRules(':: Any-Latin; :: Latin-ASCII; :: NFD; :: [:Nonspacing Mark:] Remove; :: Lower(); :: NFC;', \Transliterator::FORWARD);
+        #$withoutDiacritics = $transliterator->transliterate($text);
 
-        #Annother approach using Transliterator
-        #$transliterator = \Transliterator::createFromRules(':: Any-Latin; :: Latin-ASCII; :: NFD; :: [:Nonspacing Mark:] Remove; :: Lower(); :: NFC;', Transliterator::FORWARD);
-        #return $transliterator->transliterate($string);
+        return $withoutDiacritics ?: $text;
     }
     
     /**

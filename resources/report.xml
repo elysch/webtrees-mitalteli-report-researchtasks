@@ -3,6 +3,7 @@
     <Title><var var="I18N::translate('Research tasks report')" /></Title> <!-- MUST BE THE SAME AS ResearchTasksReportModule::REPORT_TITLE -->
     <Description><var var="I18N::translate('Research tasks report with filters and other options')" /></Description>
 
+    <SetVar name="section_bgcolor" value="#95a0c3ff" />
     <!--SetVar name="showAllFamilies" value="" /-->
     <SetVar name="showAllFamilies" value="on" />
     <SetVar name="fid" value="" />
@@ -76,6 +77,8 @@
     <!-- Date -->
     <Style name="date" font="$fonts" size="8"/>
 
+    <!-- Section labels -->
+    <Style name="sectionlabel" font="$fonts" size="12" style="b"/>
     <!-- Column labels -->
     <Style name="label" font="$fonts" size="10" style="b"/>
 
@@ -122,10 +125,10 @@
             <!-- /////////////////////////////////////////////////////////// -->
             <!-- //// Handle Individual list                            //// -->
             <!-- /////////////////////////////////////////////////////////// -->
-
-                    <TextBox bgcolor="$malebox_bgcolor" border="1" left ="0" width="0" newline="1" pos="abs" top=".">
-                        <Text color="$tcolor" style="text"><var var="I18N::translate('Individuals')" />  </Text>
-                    </TextBox>
+            
+            <TextBox bgcolor="$section_bgcolor" border="1" left ="0" width="0" newline="1" pos="abs" top=".">
+                <Text color="$tcolor" style="sectionlabel"><var var="I18N::translate('Individuals')" />  </Text>
+            </TextBox>
             
             <if condition="$showXref=='on'">
                 <SetVar name="fill" value="" />
@@ -237,9 +240,9 @@
 
             <ListTotalReset />
 
-                    <TextBox bgcolor="$malebox_bgcolor" border="1" left ="0" width="0" newline="1" pos="abs" top=".">
-                        <Text color="$tcolor" style="text"><var var="I18N::translate('Families')" />  </Text>
-                    </TextBox>
+            <TextBox bgcolor="$section_bgcolor" border="1" left ="0" width="0" newline="1" pos="abs" top=".">
+                <Text color="$tcolor" style="sectionlabel"><var var="I18N::translate('Families')" />  </Text>
+            </TextBox>
             
             <if condition="$showXref=='on'">
                 <SetVar name="fill" value="" />
@@ -314,10 +317,10 @@
             <Cell align="rightrtl" height="24" newline="1" style="label"><br/><var var="I18N::translate('Total families')"/>: <ListTotal/></Cell>
 
             <if condition="$showFilters=='on'">
-                    <TextBox bgcolor="$malebox_bgcolor" border="1" left ="0" width="0" newline="1" pos="abs" top=".">
-                        <Text color="$tcolor" style="text"><var var="I18N::translate('Report Parameters')" />  </Text>
+                    <TextBox bgcolor="$section_bgcolor" border="1" left ="0" width="0" newline="1" pos="abs" top=".">
+                        <Text color="$tcolor"  style="sectionlabel"><var var="I18N::translate('Report Parameters')" />  </Text>
                     </TextBox>
-                <TextBox bgcolor="$malebox_bgcolor" border="0" left ="0" width="0" newline="1">
+                <TextBox bgcolor="$section_bgcolor" border="0" left ="0" width="0" newline="1">
                 </TextBox>
                 <Cell newline="1" style="text">
                     <var var="I18N::translate('Show parents')" />: [<if condition="$withParents=='on'">&#x221a;</if><if condition="$withParents!='on'"> </if>]                             <br />
