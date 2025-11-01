@@ -87,16 +87,17 @@ class MitalteliReportParserGenerate_2_1 extends ReportParserGenerate
 
     #USE AN OPTIONS ARRAY CONSTANT TO MAKE SURE THE OPTIONS ARE WRITTEN CORRECTLY
     private const CONTAINS_R_OP = [
-        'NEEDLE'                      => [ "KEY" => "n"    ],
-        'NEEDLE_OP_WHOLE_WORD'        => [ "KEY" => "nww"  ],
-        'NEEDLE_OP_IGNORE_CASE'       => [ "KEY" => "nic"  ],
-        'NEEDLE_OP_REMOVE_DIACRITICS' => [ "KEY" => "nrd"  ],
-        'HAYSTACK_REPLACE_R'          => [ "KEY" => "hrr"  ],
-        'HAYSTACK_WANT_R'             => [ "KEY" => "hwr"  ],
-        'HAYSTACK_DONT_WANT_R'        => [ "KEY" => "hdwr" ],
-        'HAYSTACK_REMOVE_WANT'        => [ "KEY" => "hrw"  ],     
-        'REPEAT_W_DW_R'               => [ "KEY" => "hrn"  ],
-        'searchstr'                   => [ "KEY" => "sstr" ],
+        'NEEDLE'                      => [ "KEY" => "n"     ],
+        'NEEDLE_OP_WHOLE_WORD'        => [ "KEY" => "nww"   ],
+        'NEEDLE_OP_IGNORE_CASE'       => [ "KEY" => "nic"   ],
+        'NEEDLE_OP_REMOVE_DIACRITICS' => [ "KEY" => "nrd"   ],
+        'HAYSTACK_REPLACE_R'          => [ "KEY" => "hrr"   ],
+        'HAYSTACK_WANT_R'             => [ "KEY" => "hwr"   ],
+        'HAYSTACK_DONT_WANT_R'        => [ "KEY" => "hdwr"  ],
+        'HAYSTACK_REMOVE_WANT'        => [ "KEY" => "hrw"   ],
+        'HAYSTACK_INC_SHRD_NOTES_VAL' => [ "KEY" => 'hisnv' ],    
+        'REPEAT_W_DW_R'               => [ "KEY" => "hrn"   ],
+        'searchstr'                   => [ "KEY" => "sstr"  ],
     ];
 
     /**
@@ -1291,7 +1292,7 @@ class MitalteliReportParserGenerate_2_1 extends ReportParserGenerate
     public function searchReplaceStringsFromContainsRegexString(string $tag, string $val): ?array
     {
         // Example usage:
-        // filter4="_TODO CONTAINS_R NEEDLE='$filter_rt' NEEDLE_OP_WHOLE_WORD='$filter_rt_whole_word' NEEDLE_OP_IGNORE_CASE='$filter_rt_ignore_case' NEEDLE_OP_REMOVE_DIACRITICS='$filter_rt_remove_diacritics' HAYSTACK_WANT_R='2 CONT|2 NOTE|3 CONT' HAYSTACK_DONT_WANT_R='2 DATE|2 _WT_USER' REPEAT_W_DW_R=3 HAYSTACK_REPLACE_R='\1\2\3' HAYSTACK_REMOVE_WANT=1"
+        // filter4=filter4="_TODO CONTAINS_R NEEDLE='$filter_rt' NEEDLE_OP_WHOLE_WORD='$filter_rt_whole_word' NEEDLE_OP_IGNORE_CASE='$filter_rt_ignore_case' NEEDLE_OP_REMOVE_DIACRITICS='$filter_rt_remove_diacritics' HAYSTACK_WANT_R='2 CONT|2 NOTE|3 CONT' HAYSTACK_DONT_WANT_R='2 DATE|2 _WT_USER' REPEAT_W_DW_R=3 HAYSTACK_REPLACE_R='\1\2\3' HAYSTACK_REMOVE_WANT=1 HAYSTACK_INC_SHRD_NOTES_VAL=1"
         // filter4="_TODO CONTAINS_R NEEDLE='$filter_rt' HAYSTACK_WANT_R='2 CONT|2 NOTE|3 CONT' HAYSTACK_DONT_WANT_R='2 DATE|2 _WT_USER' REPEAT_W_DW_R=3 HAYSTACK_REPLACE_R='\1\2\3' HAYSTACK_REMOVE_WANT=1"
         // filter4="_TODO:NOTE CONTAINS_R NEEDLE='$filter_rt' HAYSTACK_WANT_R='3 CONT' HAYSTACK_REMOVE_WANT=1"
 
@@ -1347,6 +1348,7 @@ class MitalteliReportParserGenerate_2_1 extends ReportParserGenerate
         $op[self::CONTAINS_R_OP["HAYSTACK_REPLACE_R"]["KEY"]] = $args['HAYSTACK_REPLACE_R'] ?? '\0';
         $op[self::CONTAINS_R_OP["HAYSTACK_WANT_R"]["KEY"]] = $args['HAYSTACK_WANT_R'];
         $op[self::CONTAINS_R_OP["HAYSTACK_REMOVE_WANT"]["KEY"]] = $this->convertValueToBool($args['HAYSTACK_REMOVE_WANT'] ?? null);
+        $op[self::CONTAINS_R_OP["HAYSTACK_INC_SHRD_NOTES_VAL"]["KEY"]] = $this->convertValueToBool($args['HAYSTACK_INC_SHRD_NOTES_VAL'] ?? null);
         $op[self::CONTAINS_R_OP["NEEDLE"]["KEY"]] = $args['NEEDLE'];
         $op[self::CONTAINS_R_OP["NEEDLE_OP_WHOLE_WORD"]["KEY"]] = $this->convertValueToBool($args['NEEDLE_OP_WHOLE_WORD'] ?? null );
         $op[self::CONTAINS_R_OP["NEEDLE_OP_IGNORE_CASE"]["KEY"]] = $this->convertValueToBool($args['NEEDLE_OP_IGNORE_CASE'] ?? null);
@@ -1448,6 +1450,7 @@ class MitalteliReportParserGenerate_2_1 extends ReportParserGenerate
                                     'searchstr'                => $strings[self::CONTAINS_R_OP["searchstr"]["KEY"]],
                                     'replacestr'               => $strings[self::CONTAINS_R_OP["HAYSTACK_REPLACE_R"]["KEY"]],
                                     'remove'                   => $strings[self::CONTAINS_R_OP["HAYSTACK_REMOVE_WANT"]["KEY"]],
+                                    'incshrdnotesval'          => $strings[self::CONTAINS_R_OP["HAYSTACK_INC_SHRD_NOTES_VAL"]["KEY"]],
                                     'want_regex'               => $strings[self::CONTAINS_R_OP["HAYSTACK_WANT_R"]["KEY"]],
                                     'needlestr'                => $strings[self::CONTAINS_R_OP["NEEDLE"]["KEY"]],
                                     'needle_wholeword'         => $strings[self::CONTAINS_R_OP["NEEDLE_OP_WHOLE_WORD"]["KEY"]],
@@ -1542,15 +1545,46 @@ class MitalteliReportParserGenerate_2_1 extends ReportParserGenerate
                             break;
                     }
                 } else {
-                    $tag         = $filter['tag'];
-                    $searchstr   = $filter['searchstr'];
-                    $replacestr  = $filter['replacestr'];
-                    $remove      = $filter['remove'];
-                    $want_regex  = $filter['want_regex'];
-                    $needlestr   = $filter['needlestr'];
-                    $needle_ww   = $filter['needle_wholeword'];
-                    $needle_ic   = $filter['needle_ignorecase'];
-                    $needle_rd   = $filter['needle_removediacritics'];
+                    $tag             = $filter['tag'];
+                    $searchstr       = $filter['searchstr'];
+                    $replacestr      = $filter['replacestr'];
+                    $remove          = $filter['remove'];
+                    $incshrdnotesval = $filter['incshrdnotesval'];
+                    $want_regex      = $filter['want_regex'];
+                    $needlestr       = $filter['needlestr'];
+                    $needle_ww       = $filter['needle_wholeword'];
+                    $needle_ic       = $filter['needle_ignorecase'];
+                    $needle_rd       = $filter['needle_removediacritics'];
+
+                    if ($incshrdnotesval) {
+
+                        $localT = 'NOTE';
+                        $resultArray = $this->traverseTag($grec, $tag . ':' . $localT, [] /* $attrs */, function($gedrec, $attrs, $level, $subrec, $t, $number) 
+                        {
+                            $localgedrec = $gedrec;
+                            $i     = 0;
+                            $val   = '';
+                            while ($i < $number) {
+                                $i++;
+                                // Privacy check - is this a link, and are we allowed to view the linked object?
+                                $subrecord = self::getSubRecord($level, "$level $t", $subrec, $i);
+                                if (preg_match('/^\d ' . Gedcom::REGEX_TAG . ' @(' . Gedcom::REGEX_XREF . ')@/', $subrecord, $xref_match)) {
+                                    $linked_object = Registry::gedcomRecordFactory()->make($xref_match[1], $this->getFromParentPrivatePropertyWithReflection('tree'));
+                                    if ($linked_object && !$linked_object->canShow()) {
+                                        continue;
+                                    }
+                                }
+
+                                if (preg_match('/^(\d) ' . Gedcom::REGEX_TAG . ' (@' . Gedcom::REGEX_XREF . '@)/', $subrecord, $xref_match)) {
+                                    $val = $this->callFromParentPrivateMethodWithReflection('getGedcomValue', $t, $xref_match[1], $subrecord);
+                                    $localgedrec = str_replace($xref_match[2], $val, $localgedrec);
+                                }
+                            }
+                            return [$localgedrec];
+                        });
+                                      
+                        $grec = $resultArray[0];                  
+                    }
 
                     $haystack = "\n" . $grec;
 
@@ -1561,6 +1595,7 @@ class MitalteliReportParserGenerate_2_1 extends ReportParserGenerate
                         $regex = '\n(?:1 ' . $tag . '|' . $want_regex . ') ?';
                         $haystack = preg_replace("/" . $regex . "/", "\n", $haystack);
                     }
+
 
                     //-- Prepare the search. Remove diacritics if requested, both from haystack and needle
                     if ($needle_rd) {
@@ -1600,6 +1635,53 @@ class MitalteliReportParserGenerate_2_1 extends ReportParserGenerate
         return $keep;
     }
 
+    
+    protected function traverseTag(string $gedrec, string $tag, array $attrs, callable $callable): ?array
+    {
+        if (!empty($tag)) {
+            if ($tag === '@desc') {
+                $value = $this->getFromParentPrivatePropertyWithReflection('desc');
+                $value = trim($value);
+                $this->getFromParentPrivatePropertyWithReflection('current_element')->addText($value);
+            } else {
+                $tag   = str_replace('@fact', $this->getFromParentPrivatePropertyWithReflection('fact'), $tag);
+                $tags  = explode(':', $tag);
+                $level = (int) explode(' ', trim($gedrec))[0];
+                if ($level === 0) {
+                    $level++;
+                }
+                $subrec = $gedrec;
+                $t      = $tag;
+                $count  = count($tags);
+                $i      = 0;
+                while ($i < $count) {
+                    $t = $tags[$i];
+                    if (!empty($t)) {
+                        if ($i < ($count - 1)) {
+                            $subrec = self::getSubRecord($level, "$level $t", $subrec);
+                            if (empty($subrec)) {
+                                $level--;
+                                $subrec = self::getSubRecord($level, "@ $t", $gedrec);
+                                if (empty($subrec)) {
+                                    return null;
+                                }
+                            }
+                        }
+                        $level++;
+                    }
+                    $i++;
+                }
+                $level--;
+                $count = preg_match_all("/$level $t(.*)/", $subrec, $match, PREG_SET_ORDER);
+
+                $resultArray = $callable($gedrec, $attrs, $level, $subrec, $t, $count);
+            }
+        }     
+        
+        return $resultArray;
+    }
+
+
     /**
      * Handle <repeatTag>
      * Collects all the sub-records that match the tag and optional filters
@@ -1636,87 +1718,56 @@ class MitalteliReportParserGenerate_2_1 extends ReportParserGenerate
         $this->setToParentPrivatePropertyWithReflection('repeat_bytes', xml_get_current_line_number($this->getFromParentPrivatePropertyWithReflection('parser')));
 
         $tag = $attrs['tag'] ?? '';
-        if (!empty($tag)) {
-            if ($tag === '@desc') {
-                $value = $this->getFromParentPrivatePropertyWithReflection('desc');
-                $value = trim($value);
-                $this->getFromParentPrivatePropertyWithReflection('current_element')->addText($value);
-            } else {
-                $tag   = str_replace('@fact', $this->getFromParentPrivatePropertyWithReflection('fact'), $tag);
-                $tags  = explode(':', $tag);
-                $level = (int) explode(' ', trim($this->getFromParentPrivatePropertyWithReflection('gedrec')))[0];
-                if ($level === 0) {
-                    $level++;
-                }
-                $subrec = $this->getFromParentPrivatePropertyWithReflection('gedrec');
-                $t      = $tag;
-                $count  = count($tags);
-                $i      = 0;
-                while ($i < $count) {
-                    $t = $tags[$i];
-                    if (!empty($t)) {
-                        if ($i < ($count - 1)) {
-                            $subrec = self::getSubRecord($level, "$level $t", $subrec);
-                            if (empty($subrec)) {
-                                $level--;
-                                $subrec = self::getSubRecord($level, "@ $t", $this->getFromParentPrivatePropertyWithReflection('gedrec'));
-                                if (empty($subrec)) {
-                                    return;
-                                }
-                            }
-                        }
-                        $level++;
+
+        $this->traverseTag($this->getFromParentPrivatePropertyWithReflection('gedrec'), 
+                            $tag, $attrs, function($gedrec, $attrs, $level, $subrec, $t, $number) {
+            $i     = 0;
+            $do_filter = false;
+            while ($i < $number) {
+                $do_filter = true;
+                $kept_fact = false;
+                $i++;
+                // Privacy check - is this a link, and are we allowed to view the linked object?
+                $subrecord = self::getSubRecord($level, "$level $t", $subrec, $i);
+                if (preg_match('/^\d ' . Gedcom::REGEX_TAG . ' @(' . Gedcom::REGEX_XREF . ')@/', $subrecord, $xref_match)) {
+                    $linked_object = Registry::gedcomRecordFactory()->make($xref_match[1], $this->getFromParentPrivatePropertyWithReflection('tree'));
+                    if ($linked_object && !$linked_object->canShow()) {
+                        continue;
                     }
-                    $i++;
                 }
-                $level--;
-                $count = preg_match_all("/$level $t(.*)/", $subrec, $match, PREG_SET_ORDER);
-                $i     = 0;
-                $do_filter = false;
-                while ($i < $count) {
-                    $do_filter = true;
-                    $kept_todo = false;
-                    $i++;
-                    // Privacy check - is this a link, and are we allowed to view the linked object?
-                    $subrecord = self::getSubRecord($level, "$level $t", $subrec, $i);
-                    if (preg_match('/^\d ' . Gedcom::REGEX_TAG . ' @(' . Gedcom::REGEX_XREF . ')@/', $subrecord, $xref_match)) {
-                        $linked_object = Registry::gedcomRecordFactory()->make($xref_match[1], $this->getFromParentPrivatePropertyWithReflection('tree'));
-                        if ($linked_object && !$linked_object->canShow()) {
-                            continue;
+                $repeats = $this->getFromParentPrivatePropertyWithReflection('repeats');
+
+                $filters  = [];
+                $filters2 = [];
+                $this->prepareFactFilters($attrs, $filters, $filters2);
+
+                $keep  = true;
+                if ($filters !== []) {
+                    foreach ($filters as $filter) {
+                        if (!preg_match('/' . $filter . '/i', $subrecord)) {
+                            $keep = false;
+                            break;
                         }
                     }
-                    $repeats = $this->getFromParentPrivatePropertyWithReflection('repeats');
-
-                    $filters  = [];
-                    $filters2 = [];
-                    $this->prepareFactFilters($attrs, $filters, $filters2);
-
-                    $keep  = true;
-                    if ($filters !== []) {
-                        foreach ($filters as $filter) {
-                            if (!preg_match('/' . $filter . '/i', $subrecord)) {
-                                $keep = false;
-                                break;
-                            }
-                        }
-                    }
-
-                    if ($keep) {
-                        if ($filters2 !== []) {
-                            $keep = $this->applyFactFilters($subrecord, $filters2);
-                        }
-                    }
-                    if ($keep) {
-                        $repeats[] = $subrecord;
-                        $kept_todo = true;
-                    }
-
-                    $this->setToParentPrivatePropertyWithReflection('repeats', $repeats);
                 }
-                if ($do_filter && (!$kept_todo)) {
-                    $this->repeats_rec_filtered_out++;
+
+                if ($keep) {
+                    if ($filters2 !== []) {
+                        $keep = $this->applyFactFilters($subrecord, $filters2);
+                    }
                 }
+                if ($keep) {
+                    $repeats[] = $subrecord;
+                    $kept_fact = true;
+                }
+
+                $this->setToParentPrivatePropertyWithReflection('repeats', $repeats);
             }
-        }
+            if ($do_filter && (!$kept_fact)) {
+                $this->repeats_rec_filtered_out++;
+            }
+
+            return null;
+        });
     }
 }
