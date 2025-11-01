@@ -17,7 +17,7 @@
     'Show all individuals' => 'Toon alle personen', // mitalteli-report-researchtasks/resources/report.xml
     'Show all families' => 'Toon alle gezinnen', // mitalteli-report-researchtasks/resources/report.xml
     'Research Task Filter' => 'Onderzoekstaakfilter', // mitalteli-report-researchtasks/resources/report.xml
-    'Match whole string' => 'Hele tekenreeks', // mitalteli-report-researchtasks/resources/report.xml
+    'Match whole string' => 'Exacte woordovereenkomst', // mitalteli-report-researchtasks/resources/report.xml
     'Match ignoring case' => 'Negeer hoofdlettergevoeligheid', // mitalteli-report-researchtasks/resources/report.xml
     'Match ignoring diacritics' => 'Negeer diakritische tekens', // mitalteli-report-researchtasks/resources/report.xml
     'Research task creation date range start' => 'Begindatum onderzoekstaken', // mitalteli-report-researchtasks/resources/report.xml
