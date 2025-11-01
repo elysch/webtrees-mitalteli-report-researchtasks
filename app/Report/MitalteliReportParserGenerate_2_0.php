@@ -1545,7 +1545,7 @@ class MitalteliReportParserGenerate_2_0 extends ReportParserGenerate
                         $tag  = str_replace('EMAIL', '_EMAIL', $tag);
                         $tags = explode(':', $tag);
                         $t    = end($tags);
-                        $v    = self::getSubRecord(1, $tag, $grec);
+                        $v    = Functions::getSubRecord(1, $tag, $grec);
                     }
 
                     switch ($expr) {
@@ -1605,7 +1605,7 @@ class MitalteliReportParserGenerate_2_0 extends ReportParserGenerate
                             while ($i < $number) {
                                 $i++;
                                 // Privacy check - is this a link, and are we allowed to view the linked object?
-                                $subrecord = self::getSubRecord($level, "$level $t", $subrec, $i);
+                                $subrecord = Functions::getSubRecord($level, "$level $t", $subrec, $i);
                                 if (preg_match('/^\d ' . Gedcom::REGEX_TAG . ' @(' . Gedcom::REGEX_XREF . ')@/', $subrecord, $xref_match)) {
                                     $linked_object = Registry::gedcomRecordFactory()->make($xref_match[1], $this->getFromParentPrivatePropertyWithReflection('tree'));
                                     if ($linked_object && !$linked_object->canShow()) {
