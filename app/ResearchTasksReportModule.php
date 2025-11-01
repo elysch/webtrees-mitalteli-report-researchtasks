@@ -32,7 +32,7 @@ class ResearchTasksReportModule extends AbstractModule implements ModuleCustomIn
     public ModuleService $module_service;
 
     public const CUSTOM_AUTHOR = 'elysch';
-    public const CUSTOM_VERSION = '3.1.2';
+    public const CUSTOM_VERSION = '3.1.3';
     public const GITHUB_REPO = 'webtrees-mitalteli-report-researchtasks';
     public const AUTHOR_WEBSITE = 'https://github.com/elysch/webtrees-mitalteli-report-researchtasks/';
     public const CUSTOM_SUPPORT_URL = self::AUTHOR_WEBSITE . 'issues';
