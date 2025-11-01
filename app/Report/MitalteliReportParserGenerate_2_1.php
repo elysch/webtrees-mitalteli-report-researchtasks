@@ -1292,7 +1292,7 @@ class MitalteliReportParserGenerate_2_1 extends ReportParserGenerate
     public function searchReplaceStringsFromContainsRegexString(string $tag, string $val): ?array
     {
         // Example usage:
-        // filter4=filter4="_TODO CONTAINS_R NEEDLE='$filter_rt' NEEDLE_OP_WHOLE_WORD='$filter_rt_whole_word' NEEDLE_OP_IGNORE_CASE='$filter_rt_ignore_case' NEEDLE_OP_REMOVE_DIACRITICS='$filter_rt_remove_diacritics' HAYSTACK_WANT_R='2 CONT|2 NOTE|3 CONT' HAYSTACK_DONT_WANT_R='2 DATE|2 _WT_USER' REPEAT_W_DW_R=3 HAYSTACK_REPLACE_R='\1\2\3' HAYSTACK_REMOVE_WANT=1 HAYSTACK_INC_SHRD_NOTES_VAL=1"
+        // filter4="_TODO CONTAINS_R NEEDLE='$filter_rt' NEEDLE_OP_WHOLE_WORD='$filter_rt_whole_word' NEEDLE_OP_IGNORE_CASE='$filter_rt_ignore_case' NEEDLE_OP_REMOVE_DIACRITICS='$filter_rt_remove_diacritics' HAYSTACK_WANT_R='2 CONT|2 NOTE|3 CONT' HAYSTACK_DONT_WANT_R='2 DATE|2 _WT_USER' REPEAT_W_DW_R=3 HAYSTACK_REPLACE_R='\1\2\3' HAYSTACK_REMOVE_WANT=1 HAYSTACK_INC_SHRD_NOTES_VAL=1"
         // filter4="_TODO CONTAINS_R NEEDLE='$filter_rt' HAYSTACK_WANT_R='2 CONT|2 NOTE|3 CONT' HAYSTACK_DONT_WANT_R='2 DATE|2 _WT_USER' REPEAT_W_DW_R=3 HAYSTACK_REPLACE_R='\1\2\3' HAYSTACK_REMOVE_WANT=1"
         // filter4="_TODO:NOTE CONTAINS_R NEEDLE='$filter_rt' HAYSTACK_WANT_R='3 CONT' HAYSTACK_REMOVE_WANT=1"
 
@@ -1595,7 +1595,6 @@ class MitalteliReportParserGenerate_2_1 extends ReportParserGenerate
                         $regex = '\n(?:1 ' . $tag . '|' . $want_regex . ') ?';
                         $haystack = preg_replace("/" . $regex . "/", "\n", $haystack);
                     }
-
 
                     //-- Prepare the search. Remove diacritics if requested, both from haystack and needle
                     if ($needle_rd) {
