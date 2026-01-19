@@ -16,6 +16,8 @@ This module adds a report of Research Tasks to webtrees.
 
 It overrides some core Webtrees methods, so you can install it as any other module. It's quite ugly the need to access private properties, methods and constants from parent classes (in an object oriented software development perspective). There is no way to avoid using Reflection.
 
+Webtrees 2.2.5 introduces some breaking changes. The module got fixed for them on version 3.1.5.
+
 Installation & upgrading
 ------------------------
 Unpack the zip file and place the mitalteli-report-researchtasks folder in the modules_v4 folder of webtrees. Upload the newly added folder to your server. It is activated by default and will work immediately. No additional configuration is required.

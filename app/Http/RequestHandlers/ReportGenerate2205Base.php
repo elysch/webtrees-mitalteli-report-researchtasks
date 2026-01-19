@@ -17,23 +17,25 @@
 
 declare(strict_types=1);
 
+# SAME AS WEBTREES 2.2.5 ReportGenerate BUT WITHOUT FINAL KEYWORD AND DIFFERENT NAMESPACE
 namespace vendor\WebtreesModules\mitalteli\ResearchTasksReportNamespace\Http\RequestHandlers;
-
-use vendor\WebtreesModules\mitalteli\ResearchTasksReportNamespace\Report\MitalteliReportParserGenerate_2_1;
-use vendor\WebtreesModules\mitalteli\ResearchTasksReportNamespace\Report\MitalteliHtmlRenderer;
-use vendor\WebtreesModules\mitalteli\ResearchTasksReportNamespace\Report\MitalteliPdfRenderer_2_1;
-use Fisharebest\Webtrees\Http\RequestHandlers\ReportGenerate;
-use Fisharebest\Webtrees\Http\RequestHandlers\ReportListPage;
-use vendor\WebtreesModules\mitalteli\ResearchTasksReportNamespace\ResearchTasksReportModule;
-
 
 use Fig\Http\Message\StatusCodeInterface;
 use Fisharebest\Webtrees\Auth;
+use Fisharebest\Webtrees\Http\ViewResponseTrait;
 use Fisharebest\Webtrees\I18N;
 use Fisharebest\Webtrees\Module\ModuleReportInterface;
+use Fisharebest\Webtrees\Report\HtmlRenderer;
+use Fisharebest\Webtrees\Report\PdfRenderer;
+use Fisharebest\Webtrees\Report\ReportParserGenerate;
+use Fisharebest\Webtrees\Services\ModuleService;
 use Fisharebest\Webtrees\Validator;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
+use Psr\Http\Server\RequestHandlerInterface;
+
+#ADDED SAME AS WEBTREES 2.2.5 ReportGenerate BUT WITHOUT FINAL KEYWORD AND DIFFERENT NAMESPACE
+use Fisharebest\Webtrees\Http\RequestHandlers\ReportListPage;
 
 use function addcslashes;
 use function ob_get_clean;
@@ -42,51 +44,22 @@ use function redirect;
 use function response;
 use function route;
 
-/**
- * Show all available reports.
- */
-class MitalteliReportGenerate_2_1 extends ReportGenerate
+# SAME AS WEBTREES 2.2.5 ReportGenerate BUT WITHOUT FINAL KEYWORD AND DIFFERENT NAMESPACE
+class ReportGenerate2205Base implements RequestHandlerInterface
 {
+    use ViewResponseTrait;
 
-    public function getFromParentPrivatePropertyWithReflection(string $attribute_name) {
-        // 1. Apuntamos a la clase base que REALMENTE declaró la propiedad privada
-        $parentClass = 'Fisharebest\Webtrees\Http\RequestHandlers\ReportGenerate';
-        $reflectionClass = new \ReflectionClass($parentClass);
-        
-        try {
-            $property = $reflectionClass->getProperty($attribute_name);
-            $property->setAccessible(true); // Necesario para acceder a 'private'
-            
-            // 2. Extraemos el valor de la instancia actual ($this) 
-            // pero bajo el contexto de la clase que declaramos en el paso 1
-            return $property->getValue($this); 
-        } catch (\ReflectionException $e) {
-            return null;
-        }
+    public function __construct(
+        private readonly ModuleService $module_service,
+    ) {
     }
 
-
-    /**
-     * A list of available reports.
-     *
-     * @param ServerRequestInterface $request
-     *
-     * @return ResponseInterface
-     */
     public function handle(ServerRequestInterface $request): ResponseInterface
     {
         $tree   = Validator::attributes($request)->tree();
         $user   = Validator::attributes($request)->user();
         $report = Validator::attributes($request)->string('report');
-        $module = $this->getFromParentPrivatePropertyWithReflection('module_service')->findByName($report);
-
-        $coreWebtreesCustomizationDir = ResearchTasksReportModule::getCoreWebtreesCustomizationDirectory();
-
-        // Check if the report string contains the module directory path
-        // if not running from this module, redirect to the standard ReportGenerate handler
-        if (!str_contains($report, $coreWebtreesCustomizationDir)) {
-            return parent::{__FUNCTION__}($request);
-        }
+        $module = $this->module_service->findByName($report);
 
         if (!$module instanceof ModuleReportInterface) {
             return redirect(route(ReportListPage::class, ['tree' => $tree->name()]));
@@ -113,7 +86,7 @@ class MitalteliReportGenerate_2_1 extends ReportGenerate
             default:
             case 'HTML':
                 ob_start();
-                new MitalteliReportParserGenerate_2_1($xml_filename, new MitalteliHtmlRenderer(), $variables, $tree);
+                new ReportParserGenerate($xml_filename, new HtmlRenderer(), $variables, $tree);
                 $html = ob_get_clean();
 
                 $this->layout = 'layouts/report';
@@ -131,7 +104,7 @@ class MitalteliReportGenerate_2_1 extends ReportGenerate
 
             case 'PDF':
                 ob_start();
-                new MitalteliReportParserGenerate_2_1($xml_filename, new MitalteliPdfRenderer_2_1(), $variables, $tree);
+                new ReportParserGenerate($xml_filename, new PdfRenderer(), $variables, $tree);
                 $pdf = ob_get_clean();
 
                 $headers = ['content-type' => 'application/pdf'];
@@ -142,8 +115,5 @@ class MitalteliReportGenerate_2_1 extends ReportGenerate
 
                 return response($pdf, StatusCodeInterface::STATUS_OK, $headers);
         }
-
-        // Fallback: return a generic error response if format is not handled
-        return response('Invalid report format', StatusCodeInterface::STATUS_BAD_REQUEST);
     }
 }

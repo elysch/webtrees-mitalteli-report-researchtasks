@@ -1,13 +1,31 @@
 <?php
 
+/**
+ * webtrees: online genealogy
+ * Copyright (C) 2025 webtrees development team
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU General Public License for more details.
+ * You should have received a copy of the GNU General Public License
+ * along with this program. If not, see <https://www.gnu.org/licenses/>.
+ */
+
+declare(strict_types=1);
+
 namespace vendor\WebtreesModules\mitalteli\ResearchTasksReportNamespace\Http\RequestHandlers;
 
-use vendor\WebtreesModules\mitalteli\ResearchTasksReportNamespace\Report\MitalteliReportParserGenerate_2_0;
+use vendor\WebtreesModules\mitalteli\ResearchTasksReportNamespace\Report\MitalteliReportParserGenerate_2_1;
 use vendor\WebtreesModules\mitalteli\ResearchTasksReportNamespace\Report\MitalteliHtmlRenderer;
-use vendor\WebtreesModules\mitalteli\ResearchTasksReportNamespace\Report\MitalteliPdfRenderer_2_0;
-use Fisharebest\Webtrees\Http\RequestHandlers\ReportGenerate;
+use vendor\WebtreesModules\mitalteli\ResearchTasksReportNamespace\Report\MitalteliPdfRenderer_2_1;
+use vendor\WebtreesModules\mitalteli\ResearchTasksReportNamespace\Http\RequestHandlers\ReportGenerate2205Base;
 use Fisharebest\Webtrees\Http\RequestHandlers\ReportListPage;
 use vendor\WebtreesModules\mitalteli\ResearchTasksReportNamespace\ResearchTasksReportModule;
+
 
 use Fig\Http\Message\StatusCodeInterface;
 use Fisharebest\Webtrees\Auth;
@@ -17,34 +35,22 @@ use Fisharebest\Webtrees\Validator;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
 
-use Fisharebest\Webtrees\Contracts\UserInterface;
-use Fisharebest\Webtrees\Http\ViewResponseTrait;
-use Fisharebest\Webtrees\Registry;
-use Fisharebest\Webtrees\Report\HtmlRenderer;
-use Fisharebest\Webtrees\Report\PdfRenderer;
-use Fisharebest\Webtrees\Report\ReportParserGenerate;
-use Fisharebest\Webtrees\Services\ModuleService;
-use Fisharebest\Webtrees\Tree;
-use Psr\Http\Server\RequestHandlerInterface;
-
 use function addcslashes;
-use function assert;
 use function ob_get_clean;
 use function ob_start;
 use function redirect;
 use function response;
 use function route;
 
-
 /**
  * Show all available reports.
  */
-class MitalteliReportGenerate_2_0 extends ReportGenerate
+class MitalteliReportGenerate_2_2 extends ReportGenerate2205Base
 {
 
     public function getFromParentPrivatePropertyWithReflection(string $attribute_name) {
         // 1. Apuntamos a la clase base que REALMENTE declaró la propiedad privada
-        $parentClass = 'Fisharebest\Webtrees\Http\RequestHandlers\ReportGenerate';
+        $parentClass = 'vendor\WebtreesModules\mitalteli\ResearchTasksReportNamespace\Http\RequestHandlers\ReportGenerate2205Base';
         $reflectionClass = new \ReflectionClass($parentClass);
         
         try {
@@ -59,6 +65,7 @@ class MitalteliReportGenerate_2_0 extends ReportGenerate
         }
     }
 
+
     /**
      * A list of available reports.
      *
@@ -68,15 +75,9 @@ class MitalteliReportGenerate_2_0 extends ReportGenerate
      */
     public function handle(ServerRequestInterface $request): ResponseInterface
     {
-        $tree = $request->getAttribute('tree');
-        assert($tree instanceof Tree);
-
-        $user = $request->getAttribute('user');
-        assert($user instanceof UserInterface);
-
-        $data_filesystem = Registry::filesystem()->data();
-
-        $report = $request->getAttribute('report');
+        $tree   = Validator::attributes($request)->tree();
+        $user   = Validator::attributes($request)->user();
+        $report = Validator::attributes($request)->string('report');
         $module = $this->getFromParentPrivatePropertyWithReflection('module_service')->findByName($report);
 
         $coreWebtreesCustomizationDir = ResearchTasksReportModule::getCoreWebtreesCustomizationDirectory();
@@ -93,8 +94,8 @@ class MitalteliReportGenerate_2_0 extends ReportGenerate
 
         Auth::checkComponentAccess($module, ModuleReportInterface::class, $tree, $user);
 
-        $varnames  = $request->getQueryParams()['varnames'] ?? [];
-        $vars      = $request->getQueryParams()['vars'] ?? [];
+        $varnames  = Validator::queryParams($request)->array('varnames');
+        $vars      = Validator::queryParams($request)->array('vars');
         $variables = [];
 
         foreach ($varnames as $name) {
@@ -102,9 +103,8 @@ class MitalteliReportGenerate_2_0 extends ReportGenerate
         }
 
         $xml_filename = $module->resourcesFolder() . $module->xmlFilename();
-
-        $format      = $request->getQueryParams()['format'] ?? '';
-        $destination = $request->getQueryParams()['destination'] ?? '';
+        $format       = Validator::queryParams($request)->string('format');
+        $destination  = Validator::queryParams($request)->string('destination');
 
         $user->setPreference('default-report-destination', $destination);
         $user->setPreference('default-report-format', $format);
@@ -113,7 +113,7 @@ class MitalteliReportGenerate_2_0 extends ReportGenerate
             default:
             case 'HTML':
                 ob_start();
-                new MitalteliReportParserGenerate_2_0($xml_filename, new MitalteliHtmlRenderer(), $variables, $tree, $data_filesystem);
+                new MitalteliReportParserGenerate_2_1($xml_filename, new MitalteliHtmlRenderer(), $variables, $tree);
                 $html = ob_get_clean();
 
                 $this->layout = 'layouts/report';
@@ -124,20 +124,20 @@ class MitalteliReportGenerate_2_0 extends ReportGenerate
                 ]);
 
                 if ($destination === 'download') {
-                    $response = $response->withHeader('Content-Disposition', 'attachment; filename="' . addcslashes($report, '"') . '.html"');
+                    $response = $response->withHeader('content-disposition', 'attachment; filename="' . addcslashes($report, '"') . '.html"');
                 }
 
                 return $response;
 
             case 'PDF':
                 ob_start();
-                new MitalteliReportParserGenerate_2_0($xml_filename, new MitalteliPdfRenderer_2_0(), $variables, $tree, $data_filesystem);
+                new MitalteliReportParserGenerate_2_1($xml_filename, new MitalteliPdfRenderer_2_1(), $variables, $tree);
                 $pdf = ob_get_clean();
 
-                $headers = ['Content-Type' => 'application/pdf'];
+                $headers = ['content-type' => 'application/pdf'];
 
                 if ($destination === 'download') {
-                    $headers['Content-Disposition'] = 'attachment; filename="' . addcslashes($report, '"') . '.pdf"';
+                    $headers['content-disposition'] = 'attachment; filename="' . addcslashes($report, '"') . '.pdf"';
                 }
 
                 return response($pdf, StatusCodeInterface::STATUS_OK, $headers);
