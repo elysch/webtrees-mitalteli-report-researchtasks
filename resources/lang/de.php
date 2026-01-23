@@ -31,7 +31,7 @@
     'Page size' => 'Seitengröße', // mitalteli-report-researchtasks/resources/report.xml
     'Page' => 'Seite', // mitalteli-report-researchtasks/resources/report.xml
     'of' => 'von', // mitalteli-report-researchtasks/resources/report.xml
-    'Individuals' => 'Persnen', // mitalteli-report-researchtasks/resources/report.xml
+    'Individuals' => 'Personen', // mitalteli-report-researchtasks/resources/report.xml
     'XREF' => 'XREF', // mitalteli-report-researchtasks/resources/report.xml
     'Name' => 'Name', // mitalteli-report-researchtasks/resources/report.xml
     'Research Task' => 'Forschungsaufgabe', // mitalteli-report-researchtasks/resources/report.xml
