@@ -57,6 +57,34 @@ class MitalteliHtmlRenderer extends HtmlRenderer
     }
 
     /**
+     * Override textWrap to guard against the infinite loop introduced in webtrees 2.2.6.
+     *
+     * In webtrees 2.2.6, HtmlRenderer::textWrap() calculates:
+     *   $line_width = (int) ($width / ($this->getCurrentStyleHeight() / 2))
+     * If this rounds down to 0, utf8WordWrap() enters an infinite loop because
+     * mb_substr($string, 0, 0) always returns '' and $string never advances.
+     *
+     * We guard by ensuring $width is large enough relative to the font height.
+     * Using a minimum font height of 6pt (smallest realistic value):
+     *   minimum safe $width = 6/2 = 3 points
+     * Any visible cell will be wider than 3 points, so this only catches
+     * genuinely degenerate widths (0, negative, or sub-pixel).
+     *
+     * @param string $str
+     * @param float  $width
+     * @return string
+     */
+    public function textWrap(string $str, float $width): string
+    {
+        // Return unwrapped if width is too small to produce a valid line_width >= 1.
+        // Minimum font height assumed = 6pt -> minimum safe width = 3.
+        if ($width < 3.0) {
+            return $str;
+        }
+        return parent::textWrap($str, $width);
+    }
+
+    /**
      * Write text - ReportHtml
      *
      * @param string $text  Text to print

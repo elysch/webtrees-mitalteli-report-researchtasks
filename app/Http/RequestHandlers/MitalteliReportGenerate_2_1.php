@@ -99,7 +99,19 @@ class MitalteliReportGenerate_2_1 extends ReportGenerate
         $variables = [];
 
         foreach ($varnames as $name) {
-            $variables[$name]['id'] = $vars[$name] ?? '';
+            $value = $vars[$name] ?? '';
+            // In webtrees, inputs with lookup="DATE" are submitted as an array with
+            // sub-keys 'day', 'month', 'year'. Since webtrees 2.2.6, substituteVars()
+            // calls addcslashes() on these values and requires them to be strings.
+            // Convert any date array to a GEDCOM-format date string (e.g. "15 JAN 2020").
+            if (is_array($value)) {
+                $value = trim(
+                    ($value['day']   ?? '') . ' ' .
+                    ($value['month'] ?? '') . ' ' .
+                    ($value['year']  ?? '')
+                );
+            }
+            $variables[$name]['id'] = $value;
         }
 
         $xml_filename = $module->resourcesFolder() . $module->xmlFilename();

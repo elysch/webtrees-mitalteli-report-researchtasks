@@ -22,6 +22,8 @@ namespace vendor\WebtreesModules\mitalteli\ResearchTasksReportNamespace\Report;
 use vendor\WebtreesModules\mitalteli\ResearchTasksReportNamespace\ResearchTasksReportModule;
 
 use Fisharebest\Webtrees\Report\ReportParserGenerate;
+use Fisharebest\Webtrees\Webtrees;
+use Fisharebest\Webtrees\Report\HtmlRenderer;
 use Fisharebest\Webtrees\Report\AbstractRenderer;
 
 use VERSION;
@@ -80,6 +82,11 @@ class MitalteliReportParserGenerate_2_1 extends ReportParserGenerate
 
     // Fisharebest\Webtrees\Report\ReportParserGenerate
     private $parent_reflection_class;
+
+    // Since webtrees 2.2.6, $this->vars uses a flat format: $vars[$name] = 'string'
+    // Prior versions used: $vars[$name]['id'] = 'string'
+    // This flag drives getMitVars() / setMitVars() to translate between the two formats.
+    private bool $vars_flat_mode = false;
 
     private $tag_url;
 
@@ -156,6 +163,54 @@ class MitalteliReportParserGenerate_2_1 extends ReportParserGenerate
     }
 
     /**
+     * Read $this->vars from the parent (private) property and return it
+     * always in the legacy ['id'] format: $vars[$name]['id'] = 'string'.
+     *
+     * In webtrees >= 2.2.6 the core stores vars in flat format ($vars[$name] = 'string'),
+     * so this method converts on the fly for internal module code that uses ['id'].
+     *
+     * @return array<array<string>>
+     */
+    private function getMitVars(): array
+    {
+        $vars = $this->getFromParentPrivatePropertyWithReflection('vars');
+
+        if ($this->vars_flat_mode) {
+            // Convert flat format to ['id'] format for internal use
+            $result = [];
+            foreach ($vars as $name => $value) {
+                $result[$name]['id'] = is_string($value) ? $value : (string) $value;
+            }
+            return $result;
+        }
+
+        return $vars;
+    }
+
+    /**
+     * Write $vars_with_id (always in ['id'] format) back to the parent private property.
+     *
+     * In webtrees >= 2.2.6 the core expects flat format, so this method converts before saving.
+     *
+     * @param array<array<string>> $vars_with_id
+     * @return void
+     */
+    private function setMitVars(array $vars_with_id): void
+    {
+        if ($this->vars_flat_mode) {
+            // Convert ['id'] format to flat format for the core
+            $flat = [];
+            foreach ($vars_with_id as $name => $varData) {
+                $flat[$name] = is_string($varData['id'] ?? '') ? ($varData['id'] ?? '') : (string) ($varData['id'] ?? '');
+            }
+            $this->setToParentPrivatePropertyWithReflection('vars', $flat);
+        } else {
+            $this->setToParentPrivatePropertyWithReflection('vars', $vars_with_id);
+        }
+    }
+
+
+    /**
      * Create a parser for a report
      *
      * @param string               $report The XML filename
@@ -173,7 +228,46 @@ class MitalteliReportParserGenerate_2_1 extends ReportParserGenerate
             $this_reflection_class = new \ReflectionClass('\vendor\WebtreesModules\mitalteli\ResearchTasksReportNamespace\Report\MitalteliReportParserGenerate_2_1');
             $this->parent_reflection_class = $this_reflection_class->getParentClass();
         }
-        parent::{__FUNCTION__}($report, $report_root, $vars, $tree);
+
+        // Since webtrees 2.2.6, $this->vars changed structure:
+        //   OLD (<= 2.2.5): $vars[$name]['id'] = 'string'
+        //   NEW (>= 2.2.6): $vars[$name]        = 'string'  (flat)
+        // substituteVars() now calls addcslashes() directly on $this->vars[$name],
+        // so it must receive strings, not arrays.
+        // getMitVars() / setMitVars() abstract this difference for all internal code.
+        if (version_compare(Webtrees::VERSION, '2.2.6', '>=')) {
+            $this->vars_flat_mode = true;
+            $vars_for_core = [];
+            foreach ($vars as $varName => $varData) {
+                // $varData is always in ['id'] format coming from the handler
+                $value = $varData['id'] ?? '';
+                // DATE lookup fields arrive as ['day', 'month', 'year'] sub-array
+                if (is_array($value)) {
+                    $value = trim(
+                        ($value['day']   ?? '') . ' ' .
+                        ($value['month'] ?? '') . ' ' .
+                        ($value['year']  ?? '')
+                    );
+                }
+                $vars_for_core[$varName] = (string) $value;
+            }
+        } else {
+            // webtrees <= 2.2.5: keep ['id'] format, just sanitize DATE arrays
+            $vars_for_core = [];
+            foreach ($vars as $varName => $varData) {
+                $value = $varData['id'] ?? '';
+                if (is_array($value)) {
+                    $value = trim(
+                        ($value['day']   ?? '') . ' ' .
+                        ($value['month'] ?? '') . ' ' .
+                        ($value['year']  ?? '')
+                    );
+                }
+                $vars_for_core[$varName]['id'] = (string) $value;
+            }
+        }
+
+        parent::{__FUNCTION__}($report, $report_root, $vars_for_core, $tree);
     }
 
     /**
@@ -203,12 +297,20 @@ class MitalteliReportParserGenerate_2_1 extends ReportParserGenerate
             throw new DomainException('REPORT ERROR /url: The attribute "url=" is missing, not set or empty in the XML file for tag url when closing on line: ' . xml_get_current_line_number($parser_parent));
         }
 
-        if (!empty($this->getFromParentPrivatePropertyWithReflection('current_element')->getValue())) {
+        $current_element = $this->getFromParentPrivatePropertyWithReflection('current_element');
+        if (!empty($current_element->getValue())) {
             $text = '<a href="' . $this->tag_url . '">' .
-                $this->getFromParentPrivatePropertyWithReflection('current_element')->getValue() .
+                $current_element->getValue() .
                 '</a>';
 
-            $this->getFromParentPrivatePropertyWithReflection('current_element')->setText($text);
+            // ReportBaseElement::setText() was removed in webtrees 2.2.6.
+            // The only public mutator is addText(), which appends. To replace the text,
+            // we reset the private $text property to '' via reflection, then call addText().
+            $element_reflection = new \ReflectionObject($current_element);
+            $text_property      = $element_reflection->getProperty('text');
+            $text_property->setAccessible(true);
+            $text_property->setValue($current_element, '');
+            $current_element->addText($text);
         }
         $this->tag_url = '';
     }
@@ -241,7 +343,7 @@ class MitalteliReportParserGenerate_2_1 extends ReportParserGenerate
                 $id = $match[1];
             }
         } elseif (preg_match('/\$(.+)/', $attrs['id'], $match)) {
-            $vars_parent = $this->getFromParentPrivatePropertyWithReflection('vars');
+            $vars_parent = $this->getMitVars();
             if (isset($vars_parent[$match[1]]['id'])) {
                 $id = $vars_parent[$match[1]]['id'];
             }
@@ -271,13 +373,13 @@ class MitalteliReportParserGenerate_2_1 extends ReportParserGenerate
                 if (empty($setvarname)) {
                     $this->getFromParentPrivatePropertyWithReflection('current_element')->addText(I18N::translate('Private'));
                 } else {
-                    $vars_parent = $this->getFromParentPrivatePropertyWithReflection('vars');
+                    $vars_parent = $this->getMitVars();
                     if (isset($setvarappend)) {
                         $vars_parent[$setvarname]['id'] = $vars_parent[$setvarname]['id'] . $setvarappend . I18N::translate('Private');
                     } else {
                         $vars_parent[$setvarname]['id'] = I18N::translate('Private');
                     }
-                    $this->setToParentPrivatePropertyWithReflection('vars', $vars_parent);
+                    $this->setMitVars($vars_parent);
                 }
             } else {
                 $name = $record->fullName();
@@ -294,13 +396,13 @@ class MitalteliReportParserGenerate_2_1 extends ReportParserGenerate
                 if (empty($setvarname)) {
                     $this->getFromParentPrivatePropertyWithReflection('current_element')->addText(trim($name));
                 } else {
-                    $vars_parent = $this->getFromParentPrivatePropertyWithReflection('vars');
+                    $vars_parent = $this->getMitVars();
                     if (isset($setvarappend)) {
                         $vars_parent[$setvarname]['id'] = $vars_parent[$setvarname]['id'] . $setvarappend . trim($name);
                     } else {
                         $vars_parent[$setvarname]['id'] = trim($name);
                     }
-                    $this->setToParentPrivatePropertyWithReflection('vars', $vars_parent);
+                    $this->setMitVars($vars_parent);
                 }
             }
         }
@@ -325,7 +427,7 @@ class MitalteliReportParserGenerate_2_1 extends ReportParserGenerate
                 $id = $match[1];
             }
         } elseif (preg_match('/\$(.+)/', $attrs['id'], $match)) {
-            $vars_parent = $this->getFromParentPrivatePropertyWithReflection('vars');
+            $vars_parent = $this->getMitVars();
             if (isset($vars_parent[$match[1]]['id'])) {
                 $id = $vars_parent[$match[1]]['id'];
             }
@@ -360,13 +462,13 @@ class MitalteliReportParserGenerate_2_1 extends ReportParserGenerate
                 if (empty($setvarname)) {
                     $this->getFromParentPrivatePropertyWithReflection('current_element')->addText(I18N::translate('Private'));
                 } else {
-                    $vars_parent = $this->getFromParentPrivatePropertyWithReflection('vars');
+                    $vars_parent = $this->getMitVars();
                     if (isset($setvarappend)) {
                         $vars_parent[$setvarname]['id'] = $vars_parent[$setvarname]['id'] . $setvarappend . I18N::translate('Private');
                     } else {
                         $vars_parent[$setvarname]['id'] = I18N::translate('Private');
                     }
-                    $this->setToParentPrivatePropertyWithReflection('vars', $vars_parent);
+                    $this->setMitVars($vars_parent);
                 }
             } else {
                 $result = [];
@@ -385,13 +487,13 @@ class MitalteliReportParserGenerate_2_1 extends ReportParserGenerate
                 if (empty($setvarname)) {
                     $this->getFromParentPrivatePropertyWithReflection('current_element')->addText($names);
                 } else {
-                    $vars_parent = $this->getFromParentPrivatePropertyWithReflection('vars');
+                    $vars_parent = $this->getMitVars();
                     if (isset($setvarappend)) {
                         $vars_parent[$setvarname]['id'] = $vars_parent[$setvarname]['id'] . $setvarappend . $names;
                     } else {
                         $vars_parent[$setvarname]['id'] = $names;
                     }
-                    $this->setToParentPrivatePropertyWithReflection('vars', $vars_parent);
+                    $this->setMitVars($vars_parent);
                 }
             }
         }
@@ -536,7 +638,7 @@ class MitalteliReportParserGenerate_2_1 extends ReportParserGenerate
 
         $var = $attrs['var'];
         // SetVar element preset variables
-        $vars_parent = $this->getFromParentPrivatePropertyWithReflection('vars');
+        $vars_parent = $this->getMitVars();
         if (!empty($vars_parent[$var]['id'])) {
             $var = $vars_parent[$var]['id'];
         } else {
@@ -641,13 +743,13 @@ class MitalteliReportParserGenerate_2_1 extends ReportParserGenerate
             }
         }
         if (preg_match("/\\$(\w+)/", $name, $match)) {
-            $vars_parent = $this->getFromParentPrivatePropertyWithReflection('vars');
+            $vars_parent = $this->getMitVars();
             $name = $vars_parent["'" . $match[1] . "'"]['id'];
         }
         $count = preg_match_all("/\\$(\w+)/", $value, $match, PREG_SET_ORDER);
         $i     = 0;
         while ($i < $count) {
-            $vars_parent = $this->getFromParentPrivatePropertyWithReflection('vars');
+            $vars_parent = $this->getMitVars();
             $t     = $vars_parent[$match[$i][1]]['id'];
             $value = preg_replace('/\$' . $match[$i][1] . '/', $t, $value, 1);
             $i++;
@@ -673,9 +775,9 @@ class MitalteliReportParserGenerate_2_1 extends ReportParserGenerate
         if (str_contains($value, '@')) {
             $value = '';
         }
-        $vars_parent = $this->getFromParentPrivatePropertyWithReflection('vars');
+        $vars_parent = $this->getMitVars();
         $vars_parent[$name]['id'] = $value;
-        $this->setToParentPrivatePropertyWithReflection('vars', $vars_parent);
+        $this->setMitVars($vars_parent);
     }
 
     /**
@@ -730,7 +832,7 @@ class MitalteliReportParserGenerate_2_1 extends ReportParserGenerate
         if (isset($attrs['sortby'])) {
             $sortby = $attrs['sortby'];
             if (preg_match("/\\$(\w+)/", $sortby, $match)) {
-                $vars_parent = $this->getFromParentPrivatePropertyWithReflection('vars');
+                $vars_parent = $this->getMitVars();
                 $sortby = $vars_parent[$match[1]]['id'];
                 $sortby = trim($sortby);
             }
@@ -1398,7 +1500,7 @@ class MitalteliReportParserGenerate_2_1 extends ReportParserGenerate
                     $expr = trim($match["expr"]);
                     $val  = trim($match["val"]);
                     while (preg_match("/\\$(\w+)/", $val, $match)) {
-                        $vars_parent = $this->getFromParentPrivatePropertyWithReflection('vars');
+                        $vars_parent = $this->getMitVars();
                         //-- Replace all occurrences of $var in the value with the actual value from the vars array with word boundary anchors (\b) in order to prevent middle-word replacements
                         //-- It also uses unicode mode (/u) to handle UTF-8 characters correctly
                         $regex = '/[$]' . $match[1] . '\b/u';
@@ -1769,4 +1871,36 @@ class MitalteliReportParserGenerate_2_1 extends ReportParserGenerate
             return null;
         });
     }
+
+
+
+    /**
+     * Handle <TextBox>
+     *
+     * Override to fix layout in webtrees >= 2.2.6 HTML output.
+     * In webtrees 2.2.6, HtmlRenderer no longer tracks the Y position correctly
+     * during list/repeat processing, causing TextBox elements with pos="abs" top="."
+     * to be placed at the top of the page (overlapping earlier content).
+     *
+     * Fix: when rendering HTML with webtrees >= 2.2.6, convert pos="abs" to pos="rel".
+     * pos="rel" uses the normal document flow and does not depend on Y coordinates.
+     * This only affects HTML output; PDF rendering is unaffected.
+     *
+     * @param array<string> $attrs
+     * @return void
+     */
+    protected function textBoxStartHandler(array $attrs): void
+    {
+        if (
+            version_compare(Webtrees::VERSION, '2.2.6', '>=') &&
+            ($attrs['pos'] ?? '') === 'abs' &&
+            $this->getFromParentPrivatePropertyWithReflection('renderer') instanceof HtmlRenderer
+        ) {
+            $attrs['pos'] = 'rel';
+            unset($attrs['top'], $attrs['left']);
+        }
+
+        parent::{__FUNCTION__}($attrs);
+    }
+
 }

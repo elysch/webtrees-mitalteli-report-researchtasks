@@ -237,12 +237,18 @@ class MitalteliReportParserGenerate_2_0 extends ReportParserGenerate
             throw new DomainException('REPORT ERROR /url: The attribute "url=" is missing, not set or empty in the XML file for tag url when closing on line: ' . xml_get_current_line_number($parser_parent));
         }
 
-        if (!empty($this->getFromParentPrivatePropertyWithReflection('current_element')->getValue())) {
+        $current_element = $this->getFromParentPrivatePropertyWithReflection('current_element');
+        if (!empty($current_element->getValue())) {
             $text = '<a href="' . $this->tag_url . '">' .
-                $this->getFromParentPrivatePropertyWithReflection('current_element')->getValue() .
+                $current_element->getValue() .
                 '</a>';
 
-            $this->getFromParentPrivatePropertyWithReflection('current_element')->setText($text);
+            // ReportBaseElement::setText() was removed in webtrees 2.2.6.
+            $element_reflection = new \ReflectionObject($current_element);
+            $text_property      = $element_reflection->getProperty('text');
+            $text_property->setAccessible(true);
+            $text_property->setValue($current_element, '');
+            $current_element->addText($text);
         }
         $this->tag_url = '';
     }
