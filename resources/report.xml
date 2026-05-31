@@ -126,7 +126,14 @@
             <!-- //// Handle Individual list                            //// -->
             <!-- /////////////////////////////////////////////////////////// -->
             
-            <TextBox bgcolor="$section_bgcolor" border="1" left ="0" width="0" newline="1" pos="abs" top=".">
+
+            <if condition="$showXref=='on'">
+                <SetVar name="sectionWidth" value="810" />
+            </if>
+            <if condition="$showXref!='on'">
+                <SetVar name="sectionWidth" value="780" />
+            </if>
+            <TextBox bgcolor="$section_bgcolor" border="1" left ="0" width="$sectionWidth" newline="1" pos="abs" top=".">
                 <Text color="$tcolor" style="sectionlabel"><var var="I18N::translate('Individuals')" />  </Text>
             </TextBox>
             
@@ -242,7 +249,14 @@
 
             <ListTotalReset />
 
-            <TextBox bgcolor="$section_bgcolor" border="1" left ="0" width="0" newline="1" pos="abs" top=".">
+
+            <if condition="$showXref=='on'">
+                <SetVar name="sectionWidth" value="810" />
+            </if>
+            <if condition="$showXref!='on'">
+                <SetVar name="sectionWidth" value="780" />
+            </if>
+            <TextBox bgcolor="$section_bgcolor" border="1" left ="0" width="$sectionWidth" newline="1" pos="abs" top=".">
                 <Text color="$tcolor" style="sectionlabel"><var var="I18N::translate('Families')" />  </Text>
             </TextBox>
             
@@ -322,10 +336,16 @@
             <Cell align="rightrtl" height="24" newline="1" style="label"><br/><var var="I18N::translate('Total families')"/>: <ListTotal/></Cell>
 
             <if condition="$showFilters=='on'">
-                    <TextBox bgcolor="$section_bgcolor" border="1" left ="0" width="0" newline="1" pos="abs" top=".">
+                    <if condition="$showXref=='on'">
+                        <SetVar name="sectionWidth" value="810" />
+                    </if>
+                    <if condition="$showXref!='on'">
+                        <SetVar name="sectionWidth" value="780" />
+                    </if>
+                    <TextBox bgcolor="$section_bgcolor" border="1" left ="0" width="$sectionWidth" newline="1" pos="abs" top=".">
                         <Text color="$tcolor"  style="sectionlabel"><var var="I18N::translate('Report Parameters')" />  </Text>
                     </TextBox>
-                <TextBox bgcolor="$section_bgcolor" border="0" left ="0" width="0" newline="1">
+                <TextBox bgcolor="$section_bgcolor" border="0" left ="0" width="$sectionWidth" newline="1">
                 </TextBox>
                 <Cell newline="1" style="text">
                     <var var="I18N::translate('Show parents')" />: [<if condition="$withParents=='on'">&#x221a;</if><if condition="$withParents!='on'"> </if>]                             <br />

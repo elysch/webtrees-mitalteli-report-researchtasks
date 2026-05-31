@@ -123,4 +123,81 @@ class MitalteliHtmlRenderer extends HtmlRenderer
         $htmlcode = $this->nl2br_outside_tags($htmlcode);
         echo $htmlcode;
     }
+
+    /**
+     * Override setY to fix element positioning in webtrees >= 2.2.6.
+     *
+     * ReportHtmlTextBox::render() saves Y before rendering internal elements,
+     * resets it to 0, then restores it after. This means after each TextBox,
+     * getY() points to the Y *before* that box — not after it. Subsequent
+     * elements with top=CURRENT_POSITION then read this stale value and
+     * overlap the previous content.
+     *
+     * Fix: Y must never go backwards. If something tries to set Y to a value
+     * lower than maxY (the highest Y actually written), keep Y at maxY instead.
+     * This ensures all elements are always placed below the previous content.
+     */
+    public function setY(float $y): void
+    {
+        // In webtrees 2.2.6, ReportHtmlTextBox::render() calls setXy($cXT,$cYT)
+        // after rendering, restoring Y to its pre-box value. This makes getY()
+        // return a stale value. We block Y from going backwards here.
+        // NOTE: This means getY() always returns maxY, which causes double-counting
+        // in newline=1 Cell: setXy(0, getY()+height) = setXy(0, maxY+height).
+        // This is corrected in setXy() below.
+        if (version_compare(Webtrees::VERSION, '2.2.6', '>=') && $y < $this->maxY) {
+            $y = $this->maxY;
+        }
+        parent::setY($y);
+    }
+
+    public function setXy(float $x, float $y): void
+    {
+        // When a newline=1 Cell advances to the next row, it calls:
+        //   setXy(0, getY() + cellHeight + padding)
+        // But because our setY() clamps getY() to maxY, the cell height gets
+        // added on top of maxY, creating a double gap.
+        //
+        // Fix: when x=0 (newline reset) and the requested Y overshoots maxY
+        // by more than a reasonable line height (20pt), it means the height
+        // was already accounted for in maxY. Use maxY + padding instead.
+        if (
+            version_compare(Webtrees::VERSION, '2.2.6', '>=') &&
+            $x === 0.0 &&
+            $y > $this->maxY + 20.0
+        ) {
+            // The cell height was already captured in maxY via addMaxY().
+            // Just add the cell padding (cPadding * 2 = 4pt typically).
+            $y = $this->maxY + $this->cPadding * 2;
+        }
+        parent::setXy($x, $y);
+    }
+
+
+    /**
+     * Override run() to fix TextBox widths in webtrees >= 2.2.6.
+     *
+     * The report columns extend to 810pt (with XREF) or 780pt (without XREF),
+     * but noMarginWidth for US-Letter is only ~533pt. ReportHtmlTextBox clips
+     * its width to getRemainingWidth() = noMarginWidth - X, so section title
+     * TextBoxes with width="$sectionWidth" get clipped and don't cover all columns.
+     *
+     * Fix: before rendering body elements, expand noMarginWidth to the maximum
+     * column width so TextBoxes are not clipped. After rendering, restore it.
+     * In HTML output, the page margin is cosmetic only - the browser handles layout.
+     */
+    public function run(): void
+    {
+        if (version_compare(Webtrees::VERSION, '2.2.6', '>=')) {
+            // Expand noMarginWidth to cover the widest possible column layout (810pt).
+            // This prevents ReportHtmlTextBox from clipping section title widths.
+            $saved              = $this->noMarginWidth;
+            $this->noMarginWidth = max($this->noMarginWidth, 810.0);
+            parent::run();
+            $this->noMarginWidth = $saved;
+        } else {
+            parent::run();
+        }
+    }
+
 }
