@@ -139,38 +139,10 @@ class MitalteliHtmlRenderer extends HtmlRenderer
      */
     public function setY(float $y): void
     {
-        // In webtrees 2.2.6, ReportHtmlTextBox::render() calls setXy($cXT,$cYT)
-        // after rendering, restoring Y to its pre-box value. This makes getY()
-        // return a stale value. We block Y from going backwards here.
-        // NOTE: This means getY() always returns maxY, which causes double-counting
-        // in newline=1 Cell: setXy(0, getY()+height) = setXy(0, maxY+height).
-        // This is corrected in setXy() below.
         if (version_compare(Webtrees::VERSION, '2.2.6', '>=') && $y < $this->maxY) {
             $y = $this->maxY;
         }
         parent::setY($y);
-    }
-
-    public function setXy(float $x, float $y): void
-    {
-        // When a newline=1 Cell advances to the next row, it calls:
-        //   setXy(0, getY() + cellHeight + padding)
-        // But because our setY() clamps getY() to maxY, the cell height gets
-        // added on top of maxY, creating a double gap.
-        //
-        // Fix: when x=0 (newline reset) and the requested Y overshoots maxY
-        // by more than a reasonable line height (20pt), it means the height
-        // was already accounted for in maxY. Use maxY + padding instead.
-        if (
-            version_compare(Webtrees::VERSION, '2.2.6', '>=') &&
-            $x === 0.0 &&
-            $y > $this->maxY + 20.0
-        ) {
-            // The cell height was already captured in maxY via addMaxY().
-            // Just add the cell padding (cPadding * 2 = 4pt typically).
-            $y = $this->maxY + $this->cPadding * 2;
-        }
-        parent::setXy($x, $y);
     }
 
 
