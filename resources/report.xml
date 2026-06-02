@@ -218,14 +218,13 @@
                     <Cell width="200" style="text"><GedcomValue tag="_TODO" /></Cell>
     
                     <!-- NOTE -->
-                    <Cell width="200" style="text">
-                        <!-- Only with multiple sources use line feed (br) -->
-                        <SetVar name="usebr" value="0"/>
-                        <RepeatTag tag="_TODO:NOTE">
-                            <GedcomValue tag="NOTE" />
-                            <Line />
-                        </RepeatTag>
-                    </Cell>
+                    <SetVar name="wasEmptyNotesCell" value="on" />
+                    <RepeatTag tag="_TODO:NOTE">
+                        <Cell width="200" style="text"><SetVar name="wasEmptyNotesCell" value="off" /><!-- Only with multiple sources use line feed (br) --><SetVar name="usebr" value="0"/><GedcomValue tag="NOTE" /><Line /></Cell>
+                    </RepeatTag>
+                    <if condition="$wasEmptyNotesCell=='on'">
+                        <Cell width="200" style="text"></Cell> 
+                    </if>
     
                     <!-- DATE -->
                     <Cell width="80" style="text"><GedcomValue tag="_TODO:DATE" truncate="d" /></Cell>
@@ -311,14 +310,13 @@
                     <Cell width="200" style="text"><GedcomValue tag="_TODO" /></Cell>
     
                     <!-- NOTE -->
-                    <Cell width="200" style="text">
-                        <!-- Only with multiple sources use line feed (br) -->
-                        <SetVar name="usebr" value="1"/>
-                        <RepeatTag tag="_TODO:NOTE">
-                            <GedcomValue tag="NOTE" />
-                            <Line />
-                        </RepeatTag>
-                    </Cell>
+                    <SetVar name="wasEmptyNotesCell" value="on" />
+                    <RepeatTag tag="_TODO:NOTE">
+                        <Cell width="200" style="text"><SetVar name="wasEmptyNotesCell" value="off" /><!-- Only with multiple sources use line feed (br) --><SetVar name="usebr" value="0"/><GedcomValue tag="NOTE" /><Line /></Cell>
+                    </RepeatTag>
+                    <if condition="$wasEmptyNotesCell=='on'">
+                        <Cell width="200" style="text"></Cell> 
+                    </if>
     
                     <!-- DATE -->
                     <Cell width="80" style="text"><GedcomValue tag="_TODO:DATE" truncate="d" /></Cell>
