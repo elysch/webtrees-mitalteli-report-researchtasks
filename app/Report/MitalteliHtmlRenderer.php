@@ -97,29 +97,6 @@ class MitalteliHtmlRenderer extends HtmlRenderer
     }
 
     /**
-     * Expand noMarginWidth so section title TextBoxes cover all columns.
-     */
-    public function run(): void
-    {
-        $this->rowStartY = 0.0;
-
-        // Capture parent::run() 
-        ob_start();
-        if (version_compare(Webtrees::VERSION, '2.2.6', '>=')) {
-            // Expand noMarginWidth
-            $saved               = $this->noMarginWidth;
-            $this->noMarginWidth = max($this->noMarginWidth, 810.0);
-            parent::run();
-            $this->noMarginWidth = $saved;
-        } else {
-            parent::run();
-        }
-        $output = ob_get_clean();
-
-        echo $output;
-    }
-
-    /**
      * Write text - ReportHtml
      *
      * @param string $text  Text to print
