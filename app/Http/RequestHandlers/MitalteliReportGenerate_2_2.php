@@ -21,6 +21,7 @@ namespace vendor\WebtreesModules\mitalteli\ResearchTasksReportNamespace\Http\Req
 
 use vendor\WebtreesModules\mitalteli\ResearchTasksReportNamespace\Report\MitalteliReportParserGenerate_2_1;
 use vendor\WebtreesModules\mitalteli\ResearchTasksReportNamespace\Report\MitalteliHtmlRenderer;
+use vendor\WebtreesModules\mitalteli\ResearchTasksReportNamespace\Report\MitalteliObfuscator;
 use vendor\WebtreesModules\mitalteli\ResearchTasksReportNamespace\Report\MitalteliPdfRenderer_2_1;
 use vendor\WebtreesModules\mitalteli\ResearchTasksReportNamespace\Http\RequestHandlers\ReportGenerate2205Base;
 use Fisharebest\Webtrees\Http\RequestHandlers\ReportListPage;
@@ -128,6 +129,13 @@ class MitalteliReportGenerate_2_2 extends ReportGenerate2205Base
                 new MitalteliReportParserGenerate_2_1($xml_filename, new MitalteliHtmlRenderer(), $variables, $tree);
                 $html = ob_get_clean();
 
+                // DEBUG MODE: add &debug_obfuscate=1 to URL to obfuscate personal data.
+                // Replaces each word with random letters of the same length so
+                // word-wrap behaves identically to the real content.
+                if (($request->getQueryParams()['debug_obfuscate'] ?? '') === '1') {
+                    $html = (new MitalteliObfuscator())->obfuscateHtml($html);
+                }
+
                 $this->layout = 'layouts/report';
 
                 $response = $this->viewResponse('report-page', [
@@ -142,8 +150,13 @@ class MitalteliReportGenerate_2_2 extends ReportGenerate2205Base
                 return $response;
 
             case 'PDF':
+                $pdf_renderer = new MitalteliPdfRenderer_2_1();
+                // DEBUG MODE: add &debug_obfuscate=1 to URL to generate an ofuscated PDF.
+                if (($request->getQueryParams()['debug_obfuscate'] ?? '') === '1') {
+                    $pdf_renderer->debug_obfuscate = true;
+                }
                 ob_start();
-                new MitalteliReportParserGenerate_2_1($xml_filename, new MitalteliPdfRenderer_2_1(), $variables, $tree);
+                new MitalteliReportParserGenerate_2_1($xml_filename, $pdf_renderer, $variables, $tree);
                 $pdf = ob_get_clean();
 
                 $headers = ['content-type' => 'application/pdf'];

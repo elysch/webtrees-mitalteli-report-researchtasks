@@ -24,6 +24,7 @@ use vendor\WebtreesModules\mitalteli\ResearchTasksReportNamespace\ResearchTasksR
 use Fisharebest\Webtrees\Report\ReportParserGenerate;
 use Fisharebest\Webtrees\Webtrees;
 use Fisharebest\Webtrees\Report\HtmlRenderer;
+use Fisharebest\Webtrees\Report\PdfRenderer;
 use Fisharebest\Webtrees\Report\AbstractRenderer;
 
 use VERSION;
@@ -1889,6 +1890,19 @@ class MitalteliReportParserGenerate_2_1 extends ReportParserGenerate
      * @param array<string> $attrs
      * @return void
      */
+
+    /**
+     * Handle <TextBox>
+     *
+     * For HTML (>= 2.2.6): sync Y to maxY before pos="abs" top="." is processed,
+     * so TextBoxes start below all previously rendered content.
+     *
+     * For PDF: convert pos="abs" to pos="rel" so TCPDF renders TextBoxes
+     * in document flow rather than at absolute coordinates, preventing overlap
+     * when content spans multiple pages.
+     *
+     * @param array<string> $attrs
+     */
     protected function textBoxStartHandler(array $attrs): void
     {
         if (
@@ -1896,6 +1910,16 @@ class MitalteliReportParserGenerate_2_1 extends ReportParserGenerate
             ($attrs['pos'] ?? '') === 'abs' &&
             $this->getFromParentPrivatePropertyWithReflection('renderer') instanceof HtmlRenderer
         ) {
+            $attrs['pos'] = 'rel';
+            unset($attrs['top'], $attrs['left']);
+        } elseif (
+            version_compare(Webtrees::VERSION, '2.2.6', '>=') &&
+            ($attrs['pos'] ?? '') === 'abs' &&
+            ($attrs['top'] ?? '') === '.' &&
+            $this->getFromParentPrivatePropertyWithReflection('renderer') instanceof PdfRenderer
+        ) {
+            // In PDF mode, convert pos="abs" to pos="rel" so TCPDF renders
+            // the TextBox in the normal document flow after the previous content.
             $attrs['pos'] = 'rel';
             unset($attrs['top'], $attrs['left']);
         }

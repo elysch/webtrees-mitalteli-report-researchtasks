@@ -90,10 +90,18 @@
     <SetVar name="pwidth" value="436" />
 
     <SetVar name="pageOrientation" value="landscape"/>
+    <SetVar name="colWidth" value="184"/>
 
     <if condition="@format=='HTML'">
         <SetVar name="pageSize" value="A3"/>
         <SetVar name="pageOrientation" value="portrait"/>
+        <SetVar name="colWidth" value="200"/>
+    </if>
+    <if condition="$pageSize=='US-Letter'">
+        <SetVar name="colWidth" value="167"/>
+    </if>
+    <if condition="$pageSize=='A3' or $pageSize=='US-Tabloid'">
+        <SetVar name="colWidth" value="200"/>
     </if>
     <if condition="$pageSize=='A3' or $pageSize=='US-Tabloid'">
         <SetVar name="dwidth" value="285"/>
@@ -128,10 +136,32 @@
             
 
             <if condition="$showXref=='on'">
-                <SetVar name="sectionWidth" value="810" />
+                <if condition="$pageSize=='US-Letter'">
+                    <SetVar name="sectionWidth" value="711" />
+                </if>
+                <if condition="$pageSize=='A4'">
+                    <SetVar name="sectionWidth" value="762" />
+                </if>
+                <if condition="$pageSize=='A3' or $pageSize=='US-Tabloid'">
+                    <SetVar name="sectionWidth" value="810" />
+                </if>
+                <if condition="@format=='HTML'">
+                    <SetVar name="sectionWidth" value="810" />
+                </if>
             </if>
             <if condition="$showXref!='on'">
-                <SetVar name="sectionWidth" value="780" />
+                <if condition="$pageSize=='US-Letter'">
+                    <SetVar name="sectionWidth" value="681" />
+                </if>
+                <if condition="$pageSize=='A4'">
+                    <SetVar name="sectionWidth" value="732" />
+                </if>
+                <if condition="$pageSize=='A3' or $pageSize=='US-Tabloid'">
+                    <SetVar name="sectionWidth" value="780" />
+                </if>
+                <if condition="@format=='HTML'">
+                    <SetVar name="sectionWidth" value="780" />
+                </if>
             </if>
             <TextBox bgcolor="$section_bgcolor" border="1" left ="0" width="$sectionWidth" newline="1" pos="abs" top=".">
                 <Text color="$tcolor" style="sectionlabel"><var var="I18N::translate('Individuals')" />  </Text>
@@ -139,23 +169,23 @@
             
             <if condition="$showXref=='on'">
                 <SetVar name="fill" value="" />
-                <Cell bgcolor="$fill" fill="1" border="1" width="30" style="label"><var var="I18N::translate('XREF')" /></Cell>
+                <Cell bgcolor="$fill" fill="1" border="1" width="35" style="label"><var var="I18N::translate('XREF')" /></Cell>
             </if>
             <SetVar name="fill" value="" />
             <if condition="$sortby=='NAME'"><SetVar name="fill" value="#AAAAAA" /></if>
-            <Cell bgcolor="$fill" fill="1" border="1" width="200" style="label"><var var="I18N::translate('Name')" /></Cell>
+            <Cell bgcolor="$fill" fill="1" border="1" width="$colWidth" style="label"><var var="I18N::translate('Name')" /></Cell>
 
             <SetVar name="fill" value="" />
             <if condition="$sortby=='_TODO'"><SetVar name="fill" value="#AAAAAA" /></if>
-            <Cell bgcolor="$fill" fill="1" border="1" width="200" style="label"><var var="I18N::translate('Research Task')" /></Cell>
+            <Cell bgcolor="$fill" fill="1" border="1" width="$colWidth" style="label"><var var="I18N::translate('Research Task')" /></Cell>
 
             <SetVar name="fill" value="" />
             <if condition="$sortby=='_TODO:NOTE'"><SetVar name="fill" value="#AAAAAA" /></if>
-            <Cell bgcolor="$fill" fill="1" border="1" width="200" style="label"><var var="I18N::translate('Note')" /></Cell>
+            <Cell bgcolor="$fill" fill="1" border="1" width="$colWidth" style="label"><var var="I18N::translate('Note')" /></Cell>
 
             <SetVar name="fill" value="" />
             <if condition="$sortby=='_TODO:DATE' or $sortby=='_TODO%3ADATE'"><SetVar name="fill" value="#AAAAAA" /><SetVar name="sortby" value="_TODO:DATE" /></if>
-            <Cell bgcolor="$fill" fill="1" border="1" width="80" style="label"><var var="I18N::translate('Date')" /></Cell>
+            <Cell bgcolor="$fill" fill="1" border="1" width="75" style="label"><var var="I18N::translate('Date')" /></Cell>
 
             <SetVar name="fill" value="" />
             <if condition="$sortby=='_TODO:_WT_USER'"><SetVar name="fill" value="#AAAAAA" /></if>
@@ -207,36 +237,37 @@
 
                     <!-- XREF -->
                     <if condition="$showXref=='on'">
-                        <Cell width="30" style="text"><var var="$id" /></Cell>
+                        <Cell width="35" style="text"><var var="$id" /></Cell>
                     </if>
 
                     <!-- NAME -->
                     <SetVar name="url" value="$urlbase/individual/$id" />
-                    <Cell width="200" stretch="0" style="name2" height="0"><SetVar name="usebr" value="0"/><url url="$url"><var var="$Name" keephtml="true" /></url><if condition="$withParents=='on'"><br /><var var="$Father" /><br /><var var="$Mother" /></if></Cell>
+                    <Cell width="$colWidth" stretch="0" style="name2" height="0"><SetVar name="usebr" value="0"/><url url="$url"><var var="$Name" keephtml="true" /></url><if condition="$withParents=='on'"><br /><var var="$Father" /><br /><var var="$Mother" /></if></Cell>
     
                     <!-- RESEARCH TASK -->
-                    <Cell width="200" style="text"><GedcomValue tag="_TODO" /></Cell>
+                    <Cell width="$colWidth" style="text"><GedcomValue tag="_TODO" /></Cell>
     
                     <!-- NOTE -->
-                    <SetVar name="wasEmptyNotesCell" value="on" />
-                    <RepeatTag tag="_TODO:NOTE">
-                        <Cell width="200" style="text"><SetVar name="wasEmptyNotesCell" value="off" /><!-- Only with multiple sources use line feed (br) --><SetVar name="usebr" value="0"/><GedcomValue tag="NOTE" /><Line /></Cell>
-                    </RepeatTag>
-                    <if condition="$wasEmptyNotesCell=='on'">
-                        <Cell width="200" style="text"></Cell> 
-                    </if>
-    
+                    <Cell width="$colWidth" style="text">
+                        <!-- Only with multiple sources use line feed (br) -->
+                        <SetVar name="usebr" value="1"/>
+                        <RepeatTag tag="_TODO:NOTE">
+                            <GedcomValue tag="NOTE" />
+                            <Line />
+                        </RepeatTag>
+                    </Cell>
+
                     <!-- DATE -->
-                    <Cell width="80" style="text"><GedcomValue tag="_TODO:DATE" truncate="d" /></Cell>
+                    <Cell width="75" style="text"><GedcomValue tag="_TODO:DATE" truncate="d" /></Cell>
     
                     <!-- USER -->
                     <Cell newline="1" width="100" style="text"><GedcomValue tag="_TODO:_WT_USER" newline="1" /></Cell>
     
                     <!-- SET VARIABLES SO FROM THE SECOND _TODO ENTRY ON, THE XREF AND NAME COLUMNS ARE EMPTY -->
-                    <SetVar name="id" value="" />
-                    <SetVar name="Name" value="" />
-                    <SetVar name="Father" value="" />
-                    <SetVar name="Mother" value="" />
+		    <SetVar name="id" value="" />
+		    <SetVar name="Name" value="" />
+		    <SetVar name="Father" value="" />
+		    <SetVar name="Mother" value="" />
                 </RepeatTag>
             </List>
             <Cell align="rightrtl" height="24" newline="1" style="label"><br/><var var="I18N::translate('Total individuals')"/>: <ListTotal/></Cell>
@@ -250,10 +281,32 @@
 
 
             <if condition="$showXref=='on'">
-                <SetVar name="sectionWidth" value="810" />
+                <if condition="$pageSize=='US-Letter'">
+                    <SetVar name="sectionWidth" value="711" />
+                </if>
+                <if condition="$pageSize=='A4'">
+                    <SetVar name="sectionWidth" value="762" />
+                </if>
+                <if condition="$pageSize=='A3' or $pageSize=='US-Tabloid'">
+                    <SetVar name="sectionWidth" value="810" />
+                </if>
+                <if condition="@format=='HTML'">
+                    <SetVar name="sectionWidth" value="810" />
+                </if>
             </if>
             <if condition="$showXref!='on'">
-                <SetVar name="sectionWidth" value="780" />
+                <if condition="$pageSize=='US-Letter'">
+                    <SetVar name="sectionWidth" value="681" />
+                </if>
+                <if condition="$pageSize=='A4'">
+                    <SetVar name="sectionWidth" value="732" />
+                </if>
+                <if condition="$pageSize=='A3' or $pageSize=='US-Tabloid'">
+                    <SetVar name="sectionWidth" value="780" />
+                </if>
+                <if condition="@format=='HTML'">
+                    <SetVar name="sectionWidth" value="780" />
+                </if>
             </if>
             <TextBox bgcolor="$section_bgcolor" border="1" left ="0" width="$sectionWidth" newline="1" pos="abs" top=".">
                 <Text color="$tcolor" style="sectionlabel"><var var="I18N::translate('Families')" />  </Text>
@@ -261,23 +314,23 @@
             
             <if condition="$showXref=='on'">
                 <SetVar name="fill" value="" />
-                <Cell bgcolor="$fill" fill="1" border="1" width="30" style="label"><var var="I18N::translate('XREF')" /></Cell>
+                <Cell bgcolor="$fill" fill="1" border="1" width="35" style="label"><var var="I18N::translate('XREF')" /></Cell>
             </if>
             <SetVar name="fill" value="" />
             <if condition="$sortby=='NAME'"><SetVar name="fill" value="#AAAAAA" /></if>
-            <Cell bgcolor="$fill" fill="1" border="1" width="200" style="label"><var var="I18N::translate('Name')" /></Cell>
+            <Cell bgcolor="$fill" fill="1" border="1" width="$colWidth" style="label"><var var="I18N::translate('Name')" /></Cell>
 
             <SetVar name="fill" value="" />
             <if condition="$sortby=='_TODO'"><SetVar name="fill" value="#AAAAAA" /></if>
-            <Cell border="1" width="200" style="label"><var var="I18N::translate('Research Task')" /></Cell>
+            <Cell border="1" width="$colWidth" style="label"><var var="I18N::translate('Research Task')" /></Cell>
 
             <SetVar name="fill" value="" />
             <if condition="$sortby=='_TODO:NOTE'"><SetVar name="fill" value="#AAAAAA" /></if>
-            <Cell border="1" width="200" style="label"><var var="I18N::translate('Note')" /></Cell>
+            <Cell border="1" width="$colWidth" style="label"><var var="I18N::translate('Note')" /></Cell>
 
             <SetVar name="fill" value="" />
             <if condition="$sortby=='_TODO:DATE'"><SetVar name="fill" value="#AAAAAA" /></if>
-            <Cell bgcolor="$fill" fill="1" border="1" width="80" style="label"><var var="I18N::translate('Date')" /></Cell>
+            <Cell bgcolor="$fill" fill="1" border="1" width="75" style="label"><var var="I18N::translate('Date')" /></Cell>
 
             <SetVar name="fill" value="" />
             <if condition="$sortby=='_TODO:_WT_USER'"><SetVar name="fill" value="#AAAAAA" /></if>
@@ -299,27 +352,29 @@
 
                     <!-- XREF -->
                     <if condition="$showXref=='on'">
-                        <Cell width="30" style="text"><var var="$id" /></Cell>
+                        <Cell width="35" style="text"><var var="$id" /></Cell>
                     </if>
 
                     <!-- NAME -->
                     <SetVar name="url" value="$urlbase/individual/$id" />
-                    <Cell width="200" stretch="0" style="name2" height="0" url="$url"><SetVar name="usebr" value="0"/><var var="$Name" /></Cell>
+                    <Cell width="$colWidth" stretch="0" style="name2" height="0" url="$url"><SetVar name="usebr" value="0"/><var var="$Name" /></Cell>
     
                     <!-- RESEARCH TASK -->
-                    <Cell width="200" style="text"><GedcomValue tag="_TODO" /></Cell>
+                    <Cell width="$colWidth" style="text"><GedcomValue tag="_TODO" /></Cell>
     
+
                     <!-- NOTE -->
-                    <SetVar name="wasEmptyNotesCell" value="on" />
-                    <RepeatTag tag="_TODO:NOTE">
-                        <Cell width="200" style="text"><SetVar name="wasEmptyNotesCell" value="off" /><!-- Only with multiple sources use line feed (br) --><SetVar name="usebr" value="0"/><GedcomValue tag="NOTE" /><Line /></Cell>
-                    </RepeatTag>
-                    <if condition="$wasEmptyNotesCell=='on'">
-                        <Cell width="200" style="text"></Cell> 
-                    </if>
+                    <Cell width="$colWidth" style="text">
+                        <!-- Only with multiple sources use line feed (br) -->
+                        <SetVar name="usebr" value="1"/>
+                        <RepeatTag tag="_TODO:NOTE">
+                            <GedcomValue tag="NOTE" />
+                            <Line />
+                        </RepeatTag>
+                    </Cell>
     
                     <!-- DATE -->
-                    <Cell width="80" style="text"><GedcomValue tag="_TODO:DATE" truncate="d" /></Cell>
+                    <Cell width="75" style="text"><GedcomValue tag="_TODO:DATE" truncate="d" /></Cell>
     
                     <!-- USER -->
                     <Cell newline="1" width="100" style="text"><GedcomValue tag="_TODO:_WT_USER" newline="1" /></Cell>
@@ -335,10 +390,32 @@
 
             <if condition="$showFilters=='on'">
                     <if condition="$showXref=='on'">
-                        <SetVar name="sectionWidth" value="810" />
+                        <if condition="$pageSize=='US-Letter'">
+                            <SetVar name="sectionWidth" value="711" />
+                        </if>
+                        <if condition="$pageSize=='A4'">
+                            <SetVar name="sectionWidth" value="762" />
+                        </if>
+                        <if condition="$pageSize=='A3' or $pageSize=='US-Tabloid'">
+                            <SetVar name="sectionWidth" value="810" />
+                        </if>
+                        <if condition="@format=='HTML'">
+                            <SetVar name="sectionWidth" value="810" />
+                        </if>
                     </if>
                     <if condition="$showXref!='on'">
-                        <SetVar name="sectionWidth" value="780" />
+                        <if condition="$pageSize=='US-Letter'">
+                            <SetVar name="sectionWidth" value="681" />
+                        </if>
+                        <if condition="$pageSize=='A4'">
+                            <SetVar name="sectionWidth" value="732" />
+                        </if>
+                        <if condition="$pageSize=='A3' or $pageSize=='US-Tabloid'">
+                            <SetVar name="sectionWidth" value="780" />
+                        </if>
+                        <if condition="@format=='HTML'">
+                            <SetVar name="sectionWidth" value="780" />
+                        </if>
                     </if>
                     <TextBox bgcolor="$section_bgcolor" border="1" left ="0" width="$sectionWidth" newline="1" pos="abs" top=".">
                         <Text color="$tcolor"  style="sectionlabel"><var var="I18N::translate('Report Parameters')" />  </Text>

@@ -28,6 +28,7 @@ use Fisharebest\Webtrees\Report\ReportPdfCell;
 use Fisharebest\Webtrees\Webtrees;
 
 use function count;
+use vendor\WebtreesModules\mitalteli\ResearchTasksReportNamespace\Report\MitalteliObfuscator;
 
 /**
  * Class PdfRenderer
@@ -60,7 +61,8 @@ class MitalteliPdfRenderer_2_1 extends PdfRenderer
         // Check if the report string contains the module directory path
         // if not running from this module, redirect to the standard ReportGenerate handler
         if (!str_contains($this->title, ResearchTasksReportModule::REPORT_TITLE)) {
-            parent::{__FUNCTION__}(); // Call the parent method and
+            // Call the parent method
+            parent::{__FUNCTION__}();
             return;
         }
 
@@ -82,6 +84,8 @@ class MitalteliPdfRenderer_2_1 extends PdfRenderer
         $this->tcpdf->setFontSubsetting($this->getFromParentPrivateConstantWithReflection('SUBSETTING'));
         $this->tcpdf->setCompression($this->getFromParentPrivateConstantWithReflection('COMPRESSION'));
         $this->tcpdf->setRTL($this->rtl);
+        // Propagate debug_obfuscate flag to tcpdf wrapper.
+        $this->tcpdf->debug_obfuscate = $this->debug_obfuscate;
         $this->tcpdf->setCreator(Webtrees::NAME . ' ' . Webtrees::VERSION);
         $this->tcpdf->setAuthor($this->rauthor);
         $this->tcpdf->setTitle($this->title);
@@ -98,4 +102,7 @@ class MitalteliPdfRenderer_2_1 extends PdfRenderer
             $this->addElementToFooter($element);
         }
     }
+
+    /** When true, all text output is replaced with random letters of same length. */
+    public bool $debug_obfuscate = false;
 }

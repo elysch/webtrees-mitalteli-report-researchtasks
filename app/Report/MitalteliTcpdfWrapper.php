@@ -24,6 +24,7 @@ use vendor\WebtreesModules\mitalteli\ResearchTasksReportNamespace\ResearchTasksR
 use IntlDateFormatter;
 use Fisharebest\Webtrees\Session;
 use Fisharebest\Webtrees\Report\TcpdfWrapper;
+use vendor\WebtreesModules\mitalteli\ResearchTasksReportNamespace\Report\MitalteliObfuscator;
 
 /**
  * Class TcpdfWrapper
@@ -93,4 +94,63 @@ class MitalteliTcpdfWrapper extends TcpdfWrapper
         $this->SetFont('helvetica', '', 10);
         $this->Cell(0, 10, $this->getAliasNumPage().'/'.$this->getAliasNbPages(), 0, false, 'L', 0, '', 0, false, 'T', 'M');
     }
+    /** When true, all text is obfuscated before rendering. */
+    public bool $debug_obfuscate = false;
+
+    /** Shared obfuscator instance. */
+    private ?MitalteliObfuscator $obfuscator = null;
+
+    /** Get or create the obfuscator. */
+    private function obf(): MitalteliObfuscator
+    {
+        if ($this->obfuscator === null) {
+            $this->obfuscator = new MitalteliObfuscator();
+        }
+        return $this->obfuscator;
+    }
+
+    /**
+     * Override writeHTML to obfuscate text content when debug_obfuscate is set.
+     * Called by ReportPdfText::render() for all text elements.
+     */
+    public function writeHTML(
+        $html,
+        $ln = true,
+        $fill = false,
+        $reseth = false,
+        $cell = false,
+        $align = ''
+    ): void {
+        if ($this->debug_obfuscate && is_string($html)) {
+            $html = $this->obf()->obfuscateHtml($html);
+        }
+        parent::writeHTML($html, $ln, $fill, $reseth, $cell, $align);
+    }
+
+    /**
+     * Override Cell to obfuscate text when debug_obfuscate is set.
+     * Called by ReportPdfCell::render() for cell elements.
+     */
+    public function Cell(
+        $w,
+        $h = 0,
+        $txt = '',
+        $border = 0,
+        $ln = 0,
+        $align = '',
+        $fill = false,
+        $link = '',
+        $stretch = 0,
+        $ignore_min_height = false,
+        $calign = 'T',
+        $valign = 'M'
+    ): void {
+        if ($this->debug_obfuscate && is_string($txt) && $txt !== '') {
+            $txt = $this->obf()->obfuscateText($txt);
+        }
+        parent::Cell($w, $h, $txt, $border, $ln, $align, $fill, $link, $stretch,
+            $ignore_min_height, $calign, $valign);
+    }
+
+
 }
