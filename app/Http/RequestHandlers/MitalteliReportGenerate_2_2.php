@@ -105,12 +105,17 @@ class MitalteliReportGenerate_2_2 extends ReportGenerate2205Base
             // sub-keys 'day', 'month', 'year'. Since webtrees 2.2.6, substituteVars()
             // calls addcslashes() on these values and requires them to be strings.
             // Convert any date array to a GEDCOM-format date string (e.g. "15 JAN 2020").
-            if (is_array($value)) {
-                $value = trim(
-                    ($value['day']   ?? '') . ' ' .
-                    ($value['month'] ?? '') . ' ' .
-                    ($value['year']  ?? '')
-                );
+            // Verifies it is an array AND it contains at least one of day, month or year value
+            if (version_compare(Webtrees::VERSION, '2.2.6', '>=')) {
+                if (is_array($value) && (isset($value['year']) || isset($value['month']) || isset($value['day']))) {
+                    $dateParts = array_filter(array_map('trim', [
+                        $value['day']   ?? '',
+                        $value['month'] ?? '',
+                        $value['year']  ?? ''
+                    ]), 'strlen');
+
+                    $value = implode(' ', $dateParts);
+                }
             }
             $variables[$name]['id'] = $value;
         }
