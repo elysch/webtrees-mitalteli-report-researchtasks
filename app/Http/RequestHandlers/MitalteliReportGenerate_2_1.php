@@ -49,16 +49,16 @@ class MitalteliReportGenerate_2_1 extends ReportGenerate
 {
 
     public function getFromParentPrivatePropertyWithReflection(string $attribute_name) {
-        // 1. Apuntamos a la clase base que REALMENTE declaró la propiedad privada
+        // 1. Target the base class that ACTUALLY declared the private property
         $parentClass = 'Fisharebest\Webtrees\Http\RequestHandlers\ReportGenerate';
         $reflectionClass = new \ReflectionClass($parentClass);
         
         try {
             $property = $reflectionClass->getProperty($attribute_name);
-            $property->setAccessible(true); // Necesario para acceder a 'private'
+            $property->setAccessible(true); // Make the private property accessible
             
-            // 2. Extraemos el valor de la instancia actual ($this) 
-            // pero bajo el contexto de la clase que declaramos en el paso 1
+            // 2. Extract the value from the current instance ($this) 
+            // but under the context of the class declared in step 1
             return $property->getValue($this); 
         } catch (\ReflectionException $e) {
             return null;

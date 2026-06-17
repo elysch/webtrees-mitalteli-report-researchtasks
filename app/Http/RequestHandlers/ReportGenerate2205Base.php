@@ -34,7 +34,7 @@ use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
 use Psr\Http\Server\RequestHandlerInterface;
 
-#ADDED SAME AS WEBTREES 2.2.5 ReportGenerate BUT WITHOUT FINAL KEYWORD AND DIFFERENT NAMESPACE
+#ADDED
 use Fisharebest\Webtrees\Http\RequestHandlers\ReportListPage;
 
 use function addcslashes;
