@@ -35,6 +35,7 @@ use Fisharebest\Webtrees\Module\ModuleReportInterface;
 use Fisharebest\Webtrees\Validator;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
+use Fisharebest\Webtrees\Webtrees;
 
 use function addcslashes;
 use function ob_get_clean;
