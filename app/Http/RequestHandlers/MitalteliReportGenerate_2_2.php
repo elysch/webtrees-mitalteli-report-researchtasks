@@ -25,6 +25,7 @@ use vendor\WebtreesModules\mitalteli\ResearchTasksReportNamespace\Report\Mitalte
 use vendor\WebtreesModules\mitalteli\ResearchTasksReportNamespace\Report\MitalteliPdfRenderer_2_1;
 use vendor\WebtreesModules\mitalteli\ResearchTasksReportNamespace\Http\RequestHandlers\ReportGenerate2205Base;
 use Fisharebest\Webtrees\Http\RequestHandlers\ReportListPage;
+use Fisharebest\Webtrees\Http\RequestHandlers\ReportGenerate as CoreReportGenerate;
 use vendor\WebtreesModules\mitalteli\ResearchTasksReportNamespace\ResearchTasksReportModule;
 
 
@@ -77,18 +78,23 @@ class MitalteliReportGenerate_2_2 extends ReportGenerate2205Base
      */
     public function handle(ServerRequestInterface $request): ResponseInterface
     {
-        $tree   = Validator::attributes($request)->tree();
-        $user   = Validator::attributes($request)->user();
         $report = Validator::attributes($request)->string('report');
-        $module = $this->getFromParentPrivatePropertyWithReflection('module_service')->findByName($report);
+        $module_service = $this->getFromParentPrivatePropertyWithReflection('module_service');
 
         $coreWebtreesCustomizationDir = ResearchTasksReportModule::getCoreWebtreesCustomizationDirectory();
 
-        // Check if the report string contains the module directory path
-        // if not running from this module, redirect to the standard ReportGenerate handler
+        // Check if the report string contains the module directory path.
+        // If not running from this module, delegate to the ORIGINAL webtrees core handler
+        // (installed version). Do NOT use parent::handle(): the parent is a copy of the
+        // 2.2.5 handler and lacks the fixes introduced in later 2.2.x releases
+        // (e.g. date-array conversion in 2.2.6), which breaks the standard reports.
         if (!str_contains($report, $coreWebtreesCustomizationDir)) {
-            return parent::{__FUNCTION__}($request);
+            return (new CoreReportGenerate($module_service))->handle($request);
         }
+
+        $tree   = Validator::attributes($request)->tree();
+        $user   = Validator::attributes($request)->user();
+        $module = $module_service->findByName($report);
 
         if (!$module instanceof ModuleReportInterface) {
             return redirect(route(ReportListPage::class, ['tree' => $tree->name()]));

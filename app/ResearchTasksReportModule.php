@@ -11,8 +11,12 @@ namespace vendor\WebtreesModules\mitalteli\ResearchTasksReportNamespace;
 use vendor\WebtreesModules\mitalteli\ResearchTasksReportNamespace\Http\RequestHandlers\MitalteliReportGenerate_2_0;
 use vendor\WebtreesModules\mitalteli\ResearchTasksReportNamespace\Http\RequestHandlers\MitalteliReportGenerate_2_1;
 use vendor\WebtreesModules\mitalteli\ResearchTasksReportNamespace\Http\RequestHandlers\MitalteliReportGenerate_2_2;
+use vendor\WebtreesModules\mitalteli\ResearchTasksReportNamespace\Http\RequestHandlers\MitalteliReportGenerate_2_3;
+use vendor\WebtreesModules\mitalteli\ResearchTasksReportNamespace\Http\RequestHandlers\MitalteliReportSetup_2_3;
 use Fisharebest\Webtrees\Registry;
 use Fisharebest\Webtrees\Http\RequestHandlers\ReportGenerate;
+use Fisharebest\Webtrees\Http\Controllers\ReportGenerate as CoreReportGenerateController_2_3;
+use Fisharebest\Webtrees\Http\Controllers\ReportSetup as CoreReportSetupController_2_3;
 
 use Fisharebest\Webtrees\I18N;
 use Fisharebest\Webtrees\Module\AbstractModule;
@@ -33,7 +37,7 @@ class ResearchTasksReportModule extends AbstractModule implements ModuleCustomIn
     public ModuleService $module_service;
 
     public const CUSTOM_AUTHOR = 'elysch';
-    public const CUSTOM_VERSION = '3.2.1';
+    public const CUSTOM_VERSION = '3.3.0';
     public const GITHUB_REPO = 'webtrees-mitalteli-report-researchtasks';
     public const AUTHOR_WEBSITE = 'https://github.com/elysch/webtrees-mitalteli-report-researchtasks/';
     public const CUSTOM_SUPPORT_URL = self::AUTHOR_WEBSITE . 'issues';
@@ -52,7 +56,19 @@ class ResearchTasksReportModule extends AbstractModule implements ModuleCustomIn
 
     public function boot(): void
     {
-        if (version_compare(Webtrees::VERSION, '2.2.0', '>=')) {
+        if (version_compare(Webtrees::VERSION, '2.3.0-dev', '>=')) {
+            // La página de PARÁMETROS del reporte (antes de generarlo) usa un
+            // controlador/parser distinto al de generación -- hay que
+            // interceptar los DOS.
+            Registry::container()->bind(
+                CoreReportSetupController_2_3::class,
+                MitalteliReportSetup_2_3::class
+            );
+            Registry::container()->bind(
+                CoreReportGenerateController_2_3::class,
+                MitalteliReportGenerate_2_3::class
+            );
+        } elseif (version_compare(Webtrees::VERSION, '2.2.0', '>=')) {
             Registry::container()->set(ReportGenerate::class, new MitalteliReportGenerate_2_2($this->module_service));
         } elseif (version_compare(Webtrees::VERSION, '2.1.0', '>=')) {
             app()->instance(ReportGenerate::class, new MitalteliReportGenerate_2_1($this->module_service));
@@ -151,6 +167,10 @@ class ResearchTasksReportModule extends AbstractModule implements ModuleCustomIn
      */
     public function xmlFilename(): string
     {
+        if (version_compare(Webtrees::VERSION, '2.3.0-dev', '>=')) {
+            return 'report-2.3.xml';
+        }
+             
         return 'report.xml';
     }
 
