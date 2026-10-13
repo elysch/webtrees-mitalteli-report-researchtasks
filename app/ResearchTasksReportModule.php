@@ -13,6 +13,8 @@ use vendor\WebtreesModules\mitalteli\ResearchTasksReportNamespace\Http\RequestHa
 use vendor\WebtreesModules\mitalteli\ResearchTasksReportNamespace\Http\RequestHandlers\MitalteliReportGenerate_2_2;
 use vendor\WebtreesModules\mitalteli\ResearchTasksReportNamespace\Http\RequestHandlers\MitalteliReportGenerate_2_3;
 use vendor\WebtreesModules\mitalteli\ResearchTasksReportNamespace\Http\RequestHandlers\MitalteliReportSetup_2_3;
+use vendor\WebtreesModules\mitalteli\ResearchTasksReportNamespace\Http\RequestHandlers\MitalteliReportSetupPage_Legacy;
+use Fisharebest\Webtrees\Http\RequestHandlers\ReportSetupPage;
 use Fisharebest\Webtrees\Registry;
 use Fisharebest\Webtrees\Http\RequestHandlers\ReportGenerate;
 use Fisharebest\Webtrees\Http\Controllers\ReportGenerate as CoreReportGenerateController_2_3;
@@ -70,10 +72,13 @@ class ResearchTasksReportModule extends AbstractModule implements ModuleCustomIn
             );
         } elseif (version_compare(Webtrees::VERSION, '2.2.0', '>=')) {
             Registry::container()->set(ReportGenerate::class, new MitalteliReportGenerate_2_2($this->module_service));
+            Registry::container()->set(ReportSetupPage::class, new MitalteliReportSetupPage_Legacy(self::getClass(ReportSetupPage::class)));
         } elseif (version_compare(Webtrees::VERSION, '2.1.0', '>=')) {
             app()->instance(ReportGenerate::class, new MitalteliReportGenerate_2_1($this->module_service));
+            app()->instance(ReportSetupPage::class, new MitalteliReportSetupPage_Legacy(self::getClass(ReportSetupPage::class)));
         } else {
             app()->instance(ReportGenerate::class, new MitalteliReportGenerate_2_0($this->module_service));
+            app()->instance(ReportSetupPage::class, new MitalteliReportSetupPage_Legacy(self::getClass(ReportSetupPage::class)));
         }
     }
 

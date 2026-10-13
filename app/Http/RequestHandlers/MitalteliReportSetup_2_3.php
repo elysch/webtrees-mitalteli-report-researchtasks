@@ -63,6 +63,18 @@ final class MitalteliReportSetup_2_3
 
         $xref = Validator::queryParams($request)->isXref()->string('xref', '');
 
+        // Individual preseleccionado (p. ej. el individuo del usuario autenticado).
+        $indi_default = Registry::individualFactory()->make($xref, $tree);
+
+        // Familia preseleccionada: la del propio xref si es una familia; si es un
+        // individuo, su primera familia como cónyuge o, si no tiene, la familia
+        // de la que es hijo/a. Si no existe ninguna, el selector queda vacío.
+        $fam_default = Registry::familyFactory()->make($xref, $tree);
+        if ($fam_default === null && $indi_default !== null) {
+            $fam_default = $indi_default->spouseFamilies()->first()
+                ?? $indi_default->childFamilies()->first();
+        }
+
         $filename = $module->resourcesFolder() . $module->xmlFilename();
         $parser   = new MitalteliParserSetup_2_3($filename);
         $parser->process();
@@ -85,7 +97,7 @@ final class MitalteliReportSetup_2_3
                     $control = view('components/select-individual', [
                         'id'         => 'input-' . $n,
                         'name'       => 'vars[' . $input->name . ']',
-                        'individual' => Registry::individualFactory()->make($xref, $tree),
+                        'individual' => $indi_default,
                         'tree'       => $tree,
                         'required'   => true,
                     ]);
@@ -95,7 +107,7 @@ final class MitalteliReportSetup_2_3
                     $control = view('components/select-family', [
                         'id'       => 'input-' . $n,
                         'name'     => 'vars[' . $input->name . ']',
-                        'family'   => Registry::familyFactory()->make($xref, $tree),
+                        'family'   => $fam_default,
                         'tree'     => $tree,
                         'required' => true,
                     ]);
