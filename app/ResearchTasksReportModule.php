@@ -274,20 +274,7 @@ class ResearchTasksReportModule extends AbstractModule implements ModuleCustomIn
                     apply(other.checkbox, other.row);
                 }
 
-                // "Show all individuals" and "Show all families" can never both be unchecked.
-                // If the user just unchecked one while the other was already unchecked, the other
-                // one is checked again (i.e. the choice flips to the opposite side). When neither
-                // is checked on load (nothing changed), "Show all families" -- the report's
-                // default -- is checked.
-                function enforceOneChecked(changedPair) {
-                    var indi = getItem(pairs[0]), fam = getItem(pairs[1]);
-                    if (!indi || !fam || indi.checkbox.checked || fam.checkbox.checked) { return; }
-                    var other = (changedPair === pairs[0]) ? fam : (changedPair === pairs[1] ? indi : fam);
-                    other.checkbox.checked = true;
-                }
-
                 function init(event) {
-                    enforceOneChecked(null);
                     pairs.forEach(function (pair) {
                         var item = getItem(pair);
                         if (!item) { return; }
@@ -295,12 +282,8 @@ class ResearchTasksReportModule extends AbstractModule implements ModuleCustomIn
                         if (!item.checkbox.dataset.mitBound) {
                             item.checkbox.dataset.mitBound = '1';
                             item.checkbox.addEventListener('change', function () {
-                                enforceOneChecked(pair);
-                                // Re-apply BOTH sides: enforcing may have flipped the other one.
-                                pairs.forEach(function (p) {
-                                    var current = getItem(p);
-                                    if (current) { apply(current.checkbox, current.row); }
-                                });
+                                var current = getItem(pair);
+                                if (current) { apply(current.checkbox, current.row); }
                             });
                         }
                     });
