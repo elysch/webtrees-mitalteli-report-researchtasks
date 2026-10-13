@@ -37,7 +37,7 @@ class ResearchTasksReportModule extends AbstractModule implements ModuleCustomIn
     public ModuleService $module_service;
 
     public const CUSTOM_AUTHOR = 'elysch';
-    public const CUSTOM_VERSION = '3.3.0';
+    public const CUSTOM_VERSION = '3.4.0';
     public const GITHUB_REPO = 'webtrees-mitalteli-report-researchtasks';
     public const AUTHOR_WEBSITE = 'https://github.com/elysch/webtrees-mitalteli-report-researchtasks/';
     public const CUSTOM_SUPPORT_URL = self::AUTHOR_WEBSITE . 'issues';
@@ -195,63 +195,148 @@ class ResearchTasksReportModule extends AbstractModule implements ModuleCustomIn
      */
     public function bodyContent(): string
     {
-        return "\n" . '
+        // Only acts on the report setup form: every lookup is by input NAME, so it does nothing
+        // (and throws nothing) on any other webtrees page where this script is also injected.
+        $messages = json_encode([
+            // Shown next to "Show all individuals" / "Show all families", depending on their state
+            'indiChecked'   => I18N::translate('To select a specific individual, uncheck this option. The report will then show all families.'),
+            'indiUnchecked' => I18N::translate('Select an individual below. To show all individuals instead, check this option.'),
+            'famChecked'    => I18N::translate('To select a specific family, uncheck this option. The report will then show all individuals.'),
+            'famUnchecked'  => I18N::translate('Select a family below. To show all families instead, check this option.'),
+        ], JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT);
+
+        return "\n" . str_replace('__MIT_MESSAGES__', $messages, <<<'JS'
             <script type="text/javascript">
+            (function () {
+                // Translated help texts (injected by PHP).
+                var messages = __MIT_MESSAGES__;
 
-            const rowsShowHide=[];
-            
-            function findAncestor (el, sel) {
-                while ((el = el.parentElement) && !((el.matches || el.matchesSelector).call(el,sel)));
-                return el;
-            }
-            
-            function showHideRows(arr) {
-                for (var i = 0; i < arr.length; i++) {
-                    showHide(arr[i].inputRow, arr[i].checkbox);
-                }
-            }
+                // [checkbox name, name of the control that the checkbox hides]
+                var pairs = [
+                    ['vars[showAllIndividuals]', 'vars[pid]'],
+                    ['vars[showAllFamilies]',    'vars[fid]']
+                ];
 
-            function showHide(el, checkbox) {
-                if (checkbox.checked == true){
-                  // hide
-                  el.style.display = "none";
-                } else {
-                  // show
-                  el.style.display = "";
+                function findAncestor(el, sel) {
+                    while ((el = el.parentElement) && !el.matches(sel)) {}
+                    return el;
                 }
-            }
-            
-            function handleShowHideFormRow(checkboxName, labelText) {
-                let inputRow = null;
-                let checkbox = document.getElementsByName(checkboxName)[0];
-                let labels = document.getElementsByTagName(\'label\');
-                for (var i = 0; i < labels.length; i++) {
-                    var strTmp = labels[i].innerText;
-                    strTmp = (strTmp) ? strTmp.trim() : "";
-                    if (strTmp == labelText) {
-                        //alert(labels[i].textContent);
-                        inputRow=findAncestor(labels[i], ".row");
-                        showHide(inputRow,checkbox);inputRow,checkbox
-                        rowsShowHide.push( { inputRow,checkbox } );
-                        checkbox.setAttribute(\'onChange\', \'showHideRows(rowsShowHide)\');
+
+                // Checked => hide the row AND drop "required" from its controls: webtrees marks the
+                // individual/family selectors as required, and a hidden empty required field
+                // would silently block submitting the form.
+                // Help text under a checkbox, telling the user how to pick a specific record.
+                function updateHint(checkbox) {
+                    var key = checkbox.name === 'vars[showAllIndividuals]' ? 'indi' : 'fam';
+                    var hint = checkbox.parentElement.querySelector('.mit-hint');
+                    if (!hint) {
+                        hint = document.createElement('div');
+                        hint.className = 'form-text mit-hint';
+                        checkbox.parentElement.appendChild(hint);
+                    }
+                    hint.textContent = messages[key + (checkbox.checked ? 'Checked' : 'Unchecked')];
+                }
+
+                function apply(checkbox, row) {
+                    updateHint(checkbox);
+                    var hide = checkbox.checked;
+                    row.style.display = hide ? 'none' : '';
+                    row.querySelectorAll('select, input, textarea').forEach(function (c) {
+                        if (c.dataset.mitRequired === undefined) {
+                            c.dataset.mitRequired = c.required ? '1' : '0';
+                        }
+                        c.required = hide ? false : (c.dataset.mitRequired === '1');
+                    });
+                }
+
+                // Current elements for one [checkbox, control] pair (looked up each time, so it
+                // always reflects the live DOM), or null if the pair is not on this page.
+                function getItem(pair) {
+                    var checkbox = document.getElementsByName(pair[0])[0];
+                    var control  = document.getElementsByName(pair[1])[0];
+                    if (!checkbox || !control) { return null; }
+                    var row = findAncestor(control, '.row');
+                    if (!row) { return null; }
+                    return { checkbox: checkbox, control: control, row: row };
+                }
+
+                // Selecting one specific individual switches the family side to "all families",
+                // and selecting one specific family switches the individual side to "all
+                // individuals". [chosen pair, pair that must fall back to "show all"]
+                // Setting .checked from code fires no event, so apply() is called explicitly.
+                function switchSides(chosenPair, otherPair) {
+                    var chosen = getItem(chosenPair);
+                    var other  = getItem(otherPair);
+                    if (!chosen || !other || chosen.control.value === '') { return; }
+                    chosen.checkbox.checked = false;
+                    other.checkbox.checked  = true;
+                    apply(chosen.checkbox, chosen.row);
+                    apply(other.checkbox, other.row);
+                }
+
+                // "Show all individuals" and "Show all families" can never both be unchecked.
+                // If the user just unchecked one while the other was already unchecked, the other
+                // one is checked again (i.e. the choice flips to the opposite side). When neither
+                // is checked on load (nothing changed), "Show all families" -- the report's
+                // default -- is checked.
+                function enforceOneChecked(changedPair) {
+                    var indi = getItem(pairs[0]), fam = getItem(pairs[1]);
+                    if (!indi || !fam || indi.checkbox.checked || fam.checkbox.checked) { return; }
+                    var other = (changedPair === pairs[0]) ? fam : (changedPair === pairs[1] ? indi : fam);
+                    other.checkbox.checked = true;
+                }
+
+                function init(event) {
+                    enforceOneChecked(null);
+                    pairs.forEach(function (pair) {
+                        var item = getItem(pair);
+                        if (!item) { return; }
+                        apply(item.checkbox, item.row);
+                        if (!item.checkbox.dataset.mitBound) {
+                            item.checkbox.dataset.mitBound = '1';
+                            item.checkbox.addEventListener('change', function () {
+                                enforceOneChecked(pair);
+                                // Re-apply BOTH sides: enforcing may have flipped the other one.
+                                pairs.forEach(function (p) {
+                                    var current = getItem(p);
+                                    if (current) { apply(current.checkbox, current.row); }
+                                });
+                            });
+                        }
+                    });
+
+                    // pairs are [checkbox, control]; the controls are what we listen to.
+                    var indiPair = pairs[0], famPair = pairs[1];
+                    [[indiPair, famPair], [famPair, indiPair]].forEach(function (link) {
+                        var item = getItem(link[0]);
+                        if (!item || item.control.dataset.mitSwitchBound) { return; }
+                        item.control.dataset.mitSwitchBound = '1';
+                        var handler = function () { switchSides(link[0], link[1]); };
+                        // webtrees 2.2+ (Tom Select) dispatches a native "change" event on the
+                        // original <select>; 2.0/2.1 (select2) only triggers it through jQuery.
+                        item.control.addEventListener('change', handler);
+                        if (window.jQuery) { window.jQuery(item.control).on('change', handler); }
+                    });
+
+                    // First load only: a prefilled selector (the report opened from an
+                    // individual/family page via ?xref=...) must not stay hidden behind the
+                    // "show all" default. Not on pageshow, to keep the user's own state.
+                    if (!event || event.type !== 'pageshow') {
+                        var indi = getItem(indiPair), fam = getItem(famPair);
+                        if (indi && fam) {
+                            var indiSet = indi.control.value !== '', famSet = fam.control.value !== '';
+                            if (indiSet && !famSet) { switchSides(indiPair, famPair); }
+                            else if (famSet && !indiSet) { switchSides(famPair, indiPair); }
+                        }
                     }
                 }
-            }
-            
-            function handleDisableFormRow(checkboxName) {
-                let inputRow = null;
-                let checkbox = document.getElementsByName(checkboxName)[0];
-                checkbox.disabled = true;
-            }
-            
-            window.onpageshow = function() {
-                handleShowHideFormRow(\'vars[showAllIndividuals]\', \'' . I18N::translate('Individual') . '\');
-                //handleShowHideFormRow(\'vars[showAllFamilies]\', \'' . I18N::translate('Family') . '\');
-                handleDisableFormRow(\'vars[showAllFamilies]\');
-            }
-            
+
+                init();
+                window.addEventListener('pageshow', init);
+            })();
             </script>
-            ' . "\n";
+JS
+        ) . "\n";
     }
 
     /**

@@ -5,6 +5,7 @@ Module for webtrees genealogy software. A Research Tasks Report
 [![webtrees major version](https://img.shields.io/badge/webtrees-v2.0.x-green)][2]
 [![webtrees major version](https://img.shields.io/badge/webtrees-v2.1.x-green)][2]
 [![webtrees major version](https://img.shields.io/badge/webtrees-v2.2.x-green)][2]
+[![webtrees major version](https://img.shields.io/badge/webtrees-v2.3.x-green)][2]
 [![Downloads](https://img.shields.io/github/downloads/elysch/webtrees-mitalteli-report-researchtasks/total.svg)]()
 [![image](https://img.shields.io/github/downloads/elysch/webtrees-mitalteli-report-researchtasks/latest/total)][1]
 
@@ -17,6 +18,7 @@ This module adds a report of Research Tasks to webtrees.
 It overrides some core Webtrees methods, so you can install it as any other module. It's quite ugly the need to access private properties, methods and constants from parent classes (in an object oriented software development perspective). There is no way to avoid using Reflection.
 
 Webtrees 2.2.5 introduces some breaking changes. The module got fixed for them on version 3.1.5.
+Webtrees 2.3.0 introduces some new breaking changes. The module got fixed for the development version of them on version 3.3.0.
 
 Installation & upgrading
 ------------------------

@@ -45,6 +45,10 @@
     'Total families' => 'Totaal aantal gezinnen', // mitalteli-report-researchtasks/resources/report.xml
     'Report Parameters' => 'Rapportparameters', // mitalteli-report-researchtasks/resources/report.xml
     'About sort: It takes the first fact of each individual or family to sort, ignores the rest and sends empty values to the end.' => 'Over sorteren: het neemt het eerste feit van elk persoon of elk gezin om te sorteren, negeert de rest en stuurt lege waarden naar het einde.', // mitalteli-report-researchtasks/resources/report.xml
+    'To select a specific individual, uncheck this option. The report will then show all families.' => 'Om een specifieke persoon te selecteren, schakelt u deze optie uit. Het rapport toont dan alle gezinnen.', // app/ResearchTasksReportModule.php
+    'Select an individual below. To show all individuals instead, check this option.' => 'Selecteer hieronder een persoon. Om in plaats daarvan alle personen te tonen, schakelt u deze optie in.', // app/ResearchTasksReportModule.php
+    'To select a specific family, uncheck this option. The report will then show all individuals.' => 'Om een specifiek gezin te selecteren, schakelt u deze optie uit. Het rapport toont dan alle personen.', // app/ResearchTasksReportModule.php
+    'Select a family below. To show all families instead, check this option.' => 'Selecteer hieronder een gezin. Om in plaats daarvan alle gezinnen te tonen, schakelt u deze optie in.', // app/ResearchTasksReportModule.php
 
     ];
 ?>

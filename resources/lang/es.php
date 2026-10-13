@@ -46,5 +46,9 @@
     'Report Parameters' => 'Parámetros del reporte', // mitalteli-report-researchtasks/resources/report.xml
     'About sort: It takes the first fact of each individual or family to sort, ignores the rest and sends empty values to the end.' => 'Acerca del orden: Toma el primer hecho de cada individuo o familia para ordenar, ignora el resto y coloca los valores vacíos al final.', // mitalteli-report-researchtasks/resources/report.xml
 
+    'To select a specific individual, uncheck this option. The report will then show all families.' => 'Para seleccionar un individuo específico, desmarque esta opción. El reporte mostrará entonces todas las familias.', // app/ResearchTasksReportModule.php
+    'Select an individual below. To show all individuals instead, check this option.' => 'Seleccione un individuo abajo. Para mostrar todos los individuos, marque esta opción.', // app/ResearchTasksReportModule.php
+    'To select a specific family, uncheck this option. The report will then show all individuals.' => 'Para seleccionar una familia específica, desmarque esta opción. El reporte mostrará entonces todos los individuos.', // app/ResearchTasksReportModule.php
+    'Select a family below. To show all families instead, check this option.' => 'Seleccione una familia abajo. Para mostrar todas las familias, marque esta opción.', // app/ResearchTasksReportModule.php
     ];
 ?>
