@@ -39,7 +39,7 @@ class ResearchTasksReportModule extends AbstractModule implements ModuleCustomIn
     public ModuleService $module_service;
 
     public const CUSTOM_AUTHOR = 'elysch';
-    public const CUSTOM_VERSION = '3.4.0';
+    public const CUSTOM_VERSION = '3.4.1';
     public const GITHUB_REPO = 'webtrees-mitalteli-report-researchtasks';
     public const AUTHOR_WEBSITE = 'https://github.com/elysch/webtrees-mitalteli-report-researchtasks/';
     public const CUSTOM_SUPPORT_URL = self::AUTHOR_WEBSITE . 'issues';
@@ -204,9 +204,9 @@ class ResearchTasksReportModule extends AbstractModule implements ModuleCustomIn
         // (and throws nothing) on any other webtrees page where this script is also injected.
         $messages = json_encode([
             // Shown next to "Show all individuals" / "Show all families", depending on their state
-            'indiChecked'   => I18N::translate('To select a specific individual, uncheck this option. The report will then show all families.'),
+            'indiChecked'   => I18N::translate('To select a specific individual, uncheck this option.'),
             'indiUnchecked' => I18N::translate('Select an individual below. To show all individuals instead, check this option.'),
-            'famChecked'    => I18N::translate('To select a specific family, uncheck this option. The report will then show all individuals.'),
+            'famChecked'    => I18N::translate('To select a specific family, uncheck this option.'),
             'famUnchecked'  => I18N::translate('Select a family below. To show all families instead, check this option.'),
         ], JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT);
 

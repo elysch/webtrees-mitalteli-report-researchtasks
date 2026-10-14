@@ -416,7 +416,7 @@
                     <var var="I18N::translate('Show all individuals')" />: [<if condition="$showAllIndividuals=='on'">&#x221a;</if><if condition="$showAllIndividuals!='on'"> </if>]              <br />
                     <var var="I18N::translate('Individual')" />: [<if condition="$pid!=''"><var var="$pid"/> - <GetPersonName id="$pid" /></if>] <br />
                     <var var="I18N::translate('Show all families')" />: [<if condition="$showAllFamilies=='on'">&#x221a;</if><if condition="$showAllFamilies!='on'"> </if>] <br />
-                    <var var="I18N::translate('Family')" />: [<if condition="$fid!=''"><var var="$fid"/></if>] <br />
+                    <var var="I18N::translate('Family')" />: [<if condition="$fid!=''"><var var="$fid"/> - <GetPersonName id="$fid" /></if>] <br />
 <!--
                     <var var="I18N::translate('Family')" />: [<GetPersonName id="$fid" />]                                                       <br />
                     <var var="I18N::translate('Research task created by (individual)')" />: [<var var="$filter_indi_createdby"/>]                <br />
