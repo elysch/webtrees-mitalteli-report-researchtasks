@@ -50,5 +50,6 @@
     'Select an individual below. To show all individuals instead, check this option.' => 'Seleccione un individuo abajo. Para mostrar todos los individuos, marque esta opción.', // app/ResearchTasksReportModule.php
     'To select a specific family, uncheck this option.' => 'Para seleccionar una familia específica, desmarque esta opción.', // app/ResearchTasksReportModule.php
     'Select a family below. To show all families instead, check this option.' => 'Seleccione una familia abajo. Para mostrar todas las familias, marque esta opción.', // app/ResearchTasksReportModule.php
+    'Open the report in a new tab' => 'Abrir el reporte en una pestaña nueva', // app/ResearchTasksReportModule.php
     ];
 ?>

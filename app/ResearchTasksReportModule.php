@@ -39,7 +39,7 @@ class ResearchTasksReportModule extends AbstractModule implements ModuleCustomIn
     public ModuleService $module_service;
 
     public const CUSTOM_AUTHOR = 'elysch';
-    public const CUSTOM_VERSION = '3.4.1';
+    public const CUSTOM_VERSION = '3.4.2';
     public const GITHUB_REPO = 'webtrees-mitalteli-report-researchtasks';
     public const AUTHOR_WEBSITE = 'https://github.com/elysch/webtrees-mitalteli-report-researchtasks/';
     public const CUSTOM_SUPPORT_URL = self::AUTHOR_WEBSITE . 'issues';
@@ -208,13 +208,24 @@ class ResearchTasksReportModule extends AbstractModule implements ModuleCustomIn
             'indiUnchecked' => I18N::translate('Select an individual below. To show all individuals instead, check this option.'),
             'famChecked'    => I18N::translate('To select a specific family, uncheck this option.'),
             'famUnchecked'  => I18N::translate('Select a family below. To show all families instead, check this option.'),
+            // Checkbox added next to the "view" / "download" buttons
+            'newTab'        => I18N::translate('Open the report in a new tab'),
         ], JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT);
 
-        return "\n" . str_replace('__MIT_MESSAGES__', $messages, <<<'JS'
+        // webtrees < 2.2 does not keep the selected options when the user comes back to the
+        // parameters page (2.2+ does), so the form state is restored from sessionStorage there.
+        $restore = version_compare(Webtrees::VERSION, '2.2.0', '<') ? 'true' : 'false';
+
+        return "\n" . str_replace(['__MIT_MESSAGES__', '__MIT_RESTORE__'], [$messages, $restore], <<<'JS'
             <script type="text/javascript">
             (function () {
                 // Translated help texts (injected by PHP).
                 var messages = __MIT_MESSAGES__;
+
+                // true on webtrees < 2.2 (see PHP side): restore the form when coming back.
+                var restoreForm = __MIT_RESTORE__;
+                var STATE_KEY   = 'mitalteli-researchtasks-form';
+                var NEWTAB_KEY  = 'mitalteli-researchtasks-newtab';
 
                 // [checkbox name, name of the control that the checkbox hides]
                 var pairs = [
@@ -279,6 +290,125 @@ class ResearchTasksReportModule extends AbstractModule implements ModuleCustomIn
                     apply(other.checkbox, other.row);
                 }
 
+                // ---- Form state (webtrees < 2.2) ---------------------------------------------
+
+                function getForm() {
+                    var probe = document.getElementsByName(pairs[0][0])[0];
+                    return probe ? probe.closest('form') : null;
+                }
+
+                function isBackNavigation() {
+                    try {
+                        var nav = window.performance && performance.getEntriesByType
+                            ? performance.getEntriesByType('navigation')[0] : null;
+                        if (nav) { return nav.type === 'back_forward'; }
+                        return window.performance && performance.navigation
+                            && performance.navigation.type === 2;
+                    } catch (e) { return false; }
+                }
+
+                function saveState(form) {
+                    try {
+                        var state = {};
+                        Array.prototype.forEach.call(form.elements, function (el) {
+                            if (!el.name || el.type === 'hidden' || el.type === 'submit' || el.type === 'button') { return; }
+                            if (el.type === 'checkbox') {
+                                state[el.name] = { checked: el.checked };
+                            } else if (el.type === 'radio') {
+                                if (el.checked) { state[el.name] = { value: el.value }; }
+                            } else if (el.tagName === 'SELECT') {
+                                var opt = el.options[el.selectedIndex];
+                                state[el.name] = { value: el.value, text: opt ? opt.text : '' };
+                            } else {
+                                state[el.name] = { value: el.value };
+                            }
+                        });
+                        window.sessionStorage.setItem(STATE_KEY, JSON.stringify(state));
+                    } catch (e) { /* storage unavailable: nothing is remembered */ }
+                }
+
+                function restoreState(form) {
+                    var state;
+                    try { state = JSON.parse(window.sessionStorage.getItem(STATE_KEY) || 'null'); } catch (e) { return; }
+                    if (!state) { return; }
+                    var checkboxes = [];
+                    Array.prototype.forEach.call(form.elements, function (el) {
+                        var saved = state[el.name];
+                        if (!saved || !el.name || el.type === 'hidden' || el.type === 'submit' || el.type === 'button') { return; }
+                        if (el.type === 'checkbox') {
+                            checkboxes.push([el, saved.checked]);
+                        } else if (el.type === 'radio') {
+                            el.checked = (el.value === saved.value);
+                        } else if (el.tagName === 'SELECT') {
+                            // Individual/family selectors only hold their current option: recreate it.
+                            var found = Array.prototype.some.call(el.options, function (o) { return o.value === saved.value; });
+                            if (!found && saved.value !== '') {
+                                el.add(new Option(saved.text, saved.value, true, true));
+                            }
+                            el.value = saved.value;
+                        } else {
+                            el.value = saved.value;
+                        }
+                    });
+                    // Checkboxes last: init() then hides/shows the matching selector rows from them.
+                    checkboxes.forEach(function (c) { c[0].checked = c[1]; });
+                }
+
+                // ---- "Open the report in a new tab" ------------------------------------------
+
+                function addNewTabOption(form) {
+                    if (form.dataset.mitNewTab) { return; }
+                    form.dataset.mitNewTab = '1';
+
+                    var buttons = form.querySelector('button[type="submit"][name="destination"]');
+                    if (!buttons) { return; }
+
+                    var wrap = document.createElement('div');
+                    wrap.className = 'form-check mb-2';
+                    var box = document.createElement('input');
+                    box.type = 'checkbox';
+                    box.className = 'form-check-input';
+                    box.id = 'mit-new-tab';
+                    try { box.checked = window.localStorage.getItem(NEWTAB_KEY) === '1'; } catch (e) {}
+                    var label = document.createElement('label');
+                    label.className = 'form-check-label';
+                    label.htmlFor = 'mit-new-tab';
+                    label.textContent = messages.newTab;
+                    wrap.appendChild(box);
+                    wrap.appendChild(label);
+                    buttons.parentElement.insertBefore(wrap, buttons.parentElement.firstChild);
+
+                    box.addEventListener('change', function () {
+                        try { window.localStorage.setItem(NEWTAB_KEY, box.checked ? '1' : '0'); } catch (e) {}
+                    });
+
+                    form.addEventListener('submit', function (event) {
+                        // A download needs no tab; only "view" opens the report in a new one.
+                        var submitter = event.submitter;
+                        var download  = submitter && submitter.name === 'destination' && submitter.value === 'download';
+                        if (box.checked && !download) {
+                            form.target = '_blank';
+                        } else {
+                            form.removeAttribute('target');
+                        }
+                    });
+                }
+
+                function initForm() {
+                    var form = getForm();
+                    if (!form || form.dataset.mitFormInit) { return; }
+                    form.dataset.mitFormInit = '1';
+
+                    addNewTabOption(form);
+
+                    if (restoreForm) {
+                        form.addEventListener('submit', function () { saveState(form); });
+                        // Only when coming back (history): a fresh open from the menu keeps the defaults
+                        // and the preselected individual.
+                        if (isBackNavigation()) { restoreState(form); }
+                    }
+                }
+
                 function init(event) {
                     pairs.forEach(function (pair) {
                         var item = getItem(pair);
@@ -319,6 +449,7 @@ class ResearchTasksReportModule extends AbstractModule implements ModuleCustomIn
                     }
                 }
 
+                initForm();
                 init();
                 window.addEventListener('pageshow', init);
             })();

@@ -51,5 +51,6 @@
     'To select a specific family, uncheck this option.' => 'Per seleccionar una família concreta, desmarqueu aquesta opció.', // app/ResearchTasksReportModule.php
     'Select a family below. To show all families instead, check this option.' => 'Seleccioneu una família a continuació. Per mostrar totes les famílies en lloc d’això, marqueu aquesta opció.', // app/ResearchTasksReportModule.php
 
+    'Open the report in a new tab' => 'Obre l’informe en una pestanya nova', // app/ResearchTasksReportModule.php
     ];
 ?>

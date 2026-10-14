@@ -50,5 +50,6 @@
     'To select a specific family, uncheck this option.' => 'Um eine bestimmte Familie auszuwählen, deaktivieren Sie diese Option.', // app/ResearchTasksReportModule.php
     'Select a family below. To show all families instead, check this option.' => 'Wählen Sie unten eine Familie aus. Um stattdessen alle Familien anzuzeigen, aktivieren Sie diese Option.', // app/ResearchTasksReportModule.php
 
+    'Open the report in a new tab' => 'Bericht in einem neuen Tab öffnen', // app/ResearchTasksReportModule.php
     ];
 ?>

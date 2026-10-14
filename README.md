@@ -20,6 +20,8 @@ It overrides some core Webtrees methods, so you can install it as any other modu
 Webtrees 2.2.5 introduces some breaking changes. The module got fixed for them on version 3.1.5.
 Webtrees 2.3.0 introduces some new breaking changes. The module got fixed for the development version of them on version 3.3.0.
 
+Since version 3.4.2 the report parameters page has an "Open the report in a new tab" option (HTML or PDF). In webtrees 2.0/2.1 the selected options are also kept when you come back to the page with the browser's back button.
+
 Installation & upgrading
 ------------------------
 Unpack the zip file and place the mitalteli-report-researchtasks folder in the modules_v4 folder of webtrees. Upload the newly added folder to your server. It is activated by default and will work immediately. No additional configuration is required.
