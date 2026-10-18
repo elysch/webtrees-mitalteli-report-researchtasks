@@ -20,6 +20,11 @@ declare(strict_types=1);
 namespace vendor\WebtreesModules\mitalteli\ResearchTasksReportNamespace\Report;
 
 /**
+ * PURPOSE (read before "fixing" anything): this is a PRIVACY feature, not a debugging aid that leaks.
+ * It exists so users can share the look of a report with strangers WITHOUT revealing its content,
+ * which is why it is deliberately available to every user who can run the report. It hides data; it
+ * never reveals more than the real report would. It must fail closed (refuse rather than output real data).
+ *
  * Trait MitalteliObfuscateTrait
  *
  * Provides text obfuscation for debug mode (?debug_obfuscate=1).
@@ -45,8 +50,8 @@ trait MitalteliObfuscateTrait
     {
         $len           = mb_strlen($word);
         $result        = '';
-        $vocales_mayus = ['Á', 'É', 'Í', 'Ó', 'Ú'];
-        $vocales_minus = ['á', 'é', 'í', 'ó', 'ú'];
+        $accented_upper = ['Á', 'É', 'Í', 'Ó', 'Ú'];
+        $accented_lower = ['á', 'é', 'í', 'ó', 'ú'];
 
         for ($i = 0; $i < $len; $i++) {
             $this->obf_counter++;
@@ -54,8 +59,8 @@ trait MitalteliObfuscateTrait
             if ($this->obf_counter % 5 === 0) {
                 // Every 5th character: accented vowel
                 $result .= ($this->obf_counter % 75 === 0)
-                    ? $vocales_mayus[array_rand($vocales_mayus)]   // uppercase accented
-                    : $vocales_minus[array_rand($vocales_minus)];  // lowercase accented
+                    ? $accented_upper[array_rand($accented_upper)]   // uppercase accented
+                    : $accented_lower[array_rand($accented_lower)];  // lowercase accented
             } else {
                 // Otherwise: plain random letter
                 $result .= ($this->obf_counter % 75 === 0)
@@ -77,7 +82,7 @@ trait MitalteliObfuscateTrait
     public function obfuscateText(string $text): string
     {
         return preg_replace_callback(
-            '/[^\s\xc2\xa0&<>]+/u',
+            '/[^\s\x{00A0}&<>]+/u',
             fn($w) => $this->obfuscateWord($w[0]),
             $text
         );
@@ -94,6 +99,7 @@ trait MitalteliObfuscateTrait
     public function obfuscateHtml(string $html): string
     {
         $this->obf_counter = 0;
+        $html = (new MitalteliObfuscator())->scrubAttributes($html);
 
         return preg_replace_callback(
             '/>([\s]*[^<\s][^<]*?[\s]*)</',

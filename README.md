@@ -38,6 +38,18 @@ Bugs & feature requests
 -------------------------
 If you experience any bugs you can [create a new issue on GitHub][3].
 
+
+## Obfuscation (`debug_obfuscate=1`) - public on purpose
+
+`&debug_obfuscate=1` is available to **every user who can run the report**, by design. It is a privacy
+feature, not a debug leak: it replaces every word with random letters of the same length so the
+*appearance* of a report can be shared with strangers (forums, bug reports, screenshots) without
+revealing its content. It only handles data the user can already see and outputs less information than
+the real report, so it must not be restricted to admins. It must, however, **fail closed**: if
+obfuscation is requested but cannot be honoured, the request must be refused instead of returning real
+data. It works for HTML and PDF on every supported webtrees version; on 2.3 the PDF is obfuscated after
+layout with width-preserving letters, external links and images are dropped. Limits: word lengths and word count are preserved on purpose (layout fidelity).
+
  [1]: https://github.com/elysch/webtrees-mitalteli-report-researchtasks/releases/latest
  [2]: https://webtrees.github.io/download
  [3]: https://github.com/elysch/webtrees-mitalteli-report-researchtasks/issues?state=open

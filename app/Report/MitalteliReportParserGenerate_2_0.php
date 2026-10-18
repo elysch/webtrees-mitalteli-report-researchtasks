@@ -140,7 +140,7 @@ class MitalteliReportParserGenerate_2_0 extends ReportParserGenerate
     public function getFromParentPrivatePropertyWithReflection(string $attribute_name)
     {
         $property = $this->parent_reflection_class->getProperty($attribute_name);
-        $property->setAccessible(true); // Make the private property accessible
+        if (PHP_VERSION_ID < 80100) { $property->setAccessible(true); } // Make the private property accessible
         return $property->getValue($this); // Get the value from the parent object instance
     }
 
@@ -157,7 +157,7 @@ class MitalteliReportParserGenerate_2_0 extends ReportParserGenerate
     public function setToParentPrivatePropertyWithReflection(string $attribute_name, $value)
     {
         $property = $this->parent_reflection_class->getProperty($attribute_name);
-        $property->setAccessible(true);
+        if (PHP_VERSION_ID < 80100) { $property->setAccessible(true); }
         $property->setValue($this, $value); // Set the value on the parent object instance
     }
 
@@ -177,7 +177,7 @@ class MitalteliReportParserGenerate_2_0 extends ReportParserGenerate
             throw new \ReflectionException("Method {$methodName} does not exist in parent object.");
         }
         $reflectionMethod = $this->parent_reflection_class->getMethod($methodName);
-        $reflectionMethod->setAccessible(true);
+        if (PHP_VERSION_ID < 80100) { $reflectionMethod->setAccessible(true); }
 
         $params = array_slice(func_get_args(), 1); //get all the parameters after $methodName
         return $reflectionMethod->invokeArgs($this, $params);
@@ -238,17 +238,27 @@ class MitalteliReportParserGenerate_2_0 extends ReportParserGenerate
         }
 
         $current_element = $this->getFromParentPrivatePropertyWithReflection('current_element');
-        if (!empty($current_element->getValue())) {
-            $text = '<a href="' . $this->tag_url . '">' .
-                $current_element->getValue() .
+        $label           = (string) $current_element->getValue();
+
+        // Only site-relative paths ("/..." but not "//...") and http(s) URLs may become links.
+        if ($label !== '' && preg_match('~^(?:/(?!/)|https?://)~i', $this->tag_url) === 1) {
+            // The label is plain text here (addText() decodes entities), so escape it again.
+            $text = '<a href="' . htmlspecialchars($this->tag_url, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '">' .
+                htmlspecialchars($label, ENT_NOQUOTES | ENT_SUBSTITUTE, 'UTF-8') .
                 '</a>';
 
-            // ReportBaseElement::setText() was removed in webtrees 2.2.6.
-            $element_reflection = new \ReflectionObject($current_element);
-            $text_property      = $element_reflection->getProperty('text');
-            $text_property->setAccessible(true);
-            $text_property->setValue($current_element, '');
-            $current_element->addText($text);
+            // The text must be assigned directly: addText() runs strip_tags() on its argument,
+            // which removed the <a> element in webtrees < 2.3 (the link was lost in HTML and PDF).
+            if (method_exists($current_element, 'setText')) {
+                // webtrees < 2.2.6
+                $current_element->setText($text);
+            } else {
+                // ReportBaseElement::setText() was removed in webtrees 2.2.6: set the property.
+                $element_reflection = new \ReflectionObject($current_element);
+                $text_property      = $element_reflection->getProperty('text');
+                if (PHP_VERSION_ID < 80100) { $text_property->setAccessible(true); }
+                $text_property->setValue($current_element, $text);
+            }
         }
         $this->tag_url = '';
     }
@@ -655,7 +665,7 @@ class MitalteliReportParserGenerate_2_0 extends ReportParserGenerate
         } elseif ($value === '@base_url') {
             $value = "";
             if (array_key_exists("REQUEST_URI", $_SERVER)) {
-                $value = filter_var(urldecode($_SERVER["REQUEST_URI"]), FILTER_SANITIZE_URL);
+                $value = (string) preg_replace('/[^A-Za-z0-9\-._~\/?=&:%+,;!*]+/', '', urldecode($_SERVER["REQUEST_URI"]));
             }
             $url1 = "";
             $i = strpos($value, "route=");
@@ -683,7 +693,7 @@ class MitalteliReportParserGenerate_2_0 extends ReportParserGenerate
         while ($i < $count) {
             $vars_parent = $this->getFromParentPrivatePropertyWithReflection('vars');
             $t     = $vars_parent[$match[$i][1]]['id'];
-            $value = preg_replace('/\$' . $match[$i][1] . '/', $t, $value, 1);
+            $value = preg_replace_callback('/\$' . $match[$i][1] . '/', static function () use ($t) { return $t; }, $value, 1);
             $i++;
         }
         if (preg_match('/^I18N::number\((.+)\)$/', $value, $match)) {
@@ -695,7 +705,7 @@ class MitalteliReportParserGenerate_2_0 extends ReportParserGenerate
         }
 
         // Arithmetic functions
-        if (preg_match("/(\d+)\s*([-+*\/])\s*(\d+)/", $value, $match)) {
+        if (preg_match("/(\d+)\s*([-+*\/])\s*(\d+)/", $value, $match) && preg_match('/^(?:\d+(?:\.\d+)?|[\s+\-*\/()])+$/', $value)) {
             // Create an expression language with the functions used by our reports.
             $expression_provider  = new \Fisharebest\Webtrees\Report\ReportExpressionLanguageProvider();
             $expression_cache     = new NullAdapter();
@@ -1347,6 +1357,19 @@ class MitalteliReportParserGenerate_2_0 extends ReportParserGenerate
 
         $args = $this->parseKeyValueString($val);
 
+        // NEEDLE_B64: the needle may arrive base64url-encoded so it can contain ANY character
+        // (quotes, symbols...) without being able to break out of the key='value' filter string.
+        if (array_key_exists('NEEDLE_B64', $args)) {
+            $decoded = $args['NEEDLE_B64'] === null ? '' : base64_decode(strtr($args['NEEDLE_B64'], '-_', '+/'), true);
+
+            if ($decoded === false || !mb_check_encoding($decoded, 'UTF-8')) {
+                throw new DomainException('CONTAINS_R: NEEDLE_B64 is not valid base64url UTF-8 text');
+            }
+
+            $args['NEEDLE'] = $decoded === '' ? null : $decoded;
+            unset($args['NEEDLE_B64']);
+        }
+
         if (!array_key_exists('NEEDLE', $args)) {
             throw new DomainException('CONTAINS_R requires a NEEDLE argument');
         }
@@ -1382,7 +1405,7 @@ class MitalteliReportParserGenerate_2_0 extends ReportParserGenerate
             $searchDontwant = '(?:(?:\n(?:' . $args['HAYSTACK_DONT_WANT_R'] . ') ?.*)*)';
         }
 
-        for ($i = 0; $i < (int)$args['REPEAT_W_DW_R']; $i++) {
+        for ($i = 0; $i < max(1, min(5, (int) $args['REPEAT_W_DW_R'])); $i++) {
             $searchstr .= $searchWant . $searchDontwant;
         }
 
@@ -1434,19 +1457,20 @@ class MitalteliReportParserGenerate_2_0 extends ReportParserGenerate
                     } elseif (preg_match("/\d $id (.+)/", $this->getFromParentPrivatePropertyWithReflection('gedrec'), $match)) {
                         $value = "'" . str_replace('@', '', trim($match[1])) . "'";
                     }
-                    $condition = preg_replace("/@$id/", $value, $condition);
+                    $condition = preg_replace_callback("/@$id/", static function () use ($value) { return $value; }, $condition);
                 }
                 //-- handle regular expressions
                 if (preg_match("/(?P<tag>" . Gedcom::REGEX_TAG . "(" . ":" . Gedcom::REGEX_TAG . ")*" . ")\s*(?P<expr>[^\s$]+)\s*(?P<val>.+)/", $condition, $match)) {
                     $tag  = trim($match["tag"]);
                     $expr = trim($match["expr"]);
                     $val  = trim($match["val"]);
-                    while (preg_match("/\\$(\w+)/", $val, $match)) {
+                    $substGuard = 0;
+                    while ($substGuard++ < 20 && preg_match("/\\$(\w+)/", $val, $match)) {
                         $vars_parent = $this->getFromParentPrivatePropertyWithReflection('vars');
                         //-- Replace all occurrences of $var in the value with the actual value from the vars array with word boundary anchors (\b) in order to prevent middle-word replacements
                         //-- It also uses unicode mode (/u) to handle UTF-8 characters correctly
                         $regex = '/[$]' . $match[1] . '\b/u';
-                        $val = preg_replace($regex, trim($vars_parent[$match[1]]['id']), $val);
+                        $val = preg_replace_callback($regex, static function () use ($vars_parent, $match) { return trim($vars_parent[$match[1]]['id']); }, $val);
                     }
                     if ($val !== '') {
                         $searchstr = '';
@@ -1646,28 +1670,13 @@ class MitalteliReportParserGenerate_2_0 extends ReportParserGenerate
                         $needlestr = $this->removeDiacritics($needlestr);
                     }
 
-                    //-- Prepare the search. Escape special regex characters in needle and "/" delimiter
-                    $needlestr = preg_quote($needlestr, '/');
-
-                    //-- Prepare the search. Add word boundary anchors if requested
-                    if ($needle_ww) {
-                        $needlestr = '\b' . $needlestr . '\b';
-                    }
-
-                    //-- Prepare the search. Ignore case if requested
-                    if ($needle_ic) {
-                        $needlestr = '(?i)' . $needlestr;
-                    }
-
-                    //-- Prepare the search. Allow for extra spaces
-                    $needlestr = str_replace(' ', '\s*', $needlestr);
-                    
                     //-- Prepare the search. Remove new lines from haystack
-                    $haystack = preg_replace('/\n/', " ", $haystack);
+                    $haystack = preg_replace('/\n/', ' ', $haystack) ?? $haystack;
 
-
-                    //-- Check if the needle exists in the haystack
-                    if (!preg_match('/' . $needlestr . '/', $haystack)) {
+                    //-- Check if the needle exists in the haystack.
+                    //   "Match whole string" OFF: every word, any order, any amount of spaces.
+                    //   "Match whole string" ON : the text exactly as typed (same order and spaces).
+                    if (!MitalteliNeedleMatcher::matches($haystack, (string) $needlestr, (bool) $needle_ww, (bool) $needle_ic)) {
                         $keep = false;
                         continue;
                     }
@@ -1764,11 +1773,25 @@ class MitalteliReportParserGenerate_2_0 extends ReportParserGenerate
 
         $this->traverseTag($this->getFromParentPrivatePropertyWithReflection('gedrec'), 
                             $tag, $attrs, function($gedrec, $attrs, $level, $subrec, $t, $number) {
-            $i     = 0;
+            $i         = 0;
             $do_filter = false;
+            // FIX (contadores): a record counts as "filtered out" only when NONE of its
+            // facts were kept. The old code looked only at the LAST fact ($kept_fact was
+            // reset on every iteration), so a person whose last _TODO was filtered out
+            // was subtracted from the total even though it was displayed.
+            $any_kept  = false;
+            // Only the RepeatTag that declares filterN attributes decides whether the whole
+            // record is counted; a nested, unfiltered one (e.g. _TODO:NOTE) must never
+            // change the total (it could, e.g., when its only note is private).
+            $declares_filters = false;
+            foreach ($attrs as $attr_key => $attr_value) {
+                if (preg_match('/^filter\d$/', (string) $attr_key) === 1 && (string) $attr_value !== '') {
+                    $declares_filters = true;
+                    break;
+                }
+            }
             while ($i < $number) {
                 $do_filter = true;
-                $kept_fact = false;
                 $i++;
                 // Privacy check - is this a link, and are we allowed to view the linked object?
                 $subrecord = Functions::getSubRecord($level, "$level $t", $subrec, $i);
@@ -1801,12 +1824,12 @@ class MitalteliReportParserGenerate_2_0 extends ReportParserGenerate
                 }
                 if ($keep) {
                     $repeats[] = $subrecord;
-                    $kept_fact = true;
+                    $any_kept  = true;
                 }
 
                 $this->setToParentPrivatePropertyWithReflection('repeats', $repeats);
             }
-            if ($do_filter && (!$kept_fact)) {
+            if ($do_filter && $declares_filters && !$any_kept) {
                 $this->repeats_rec_filtered_out++;
             }
 

@@ -13,12 +13,23 @@ use vendor\WebtreesModules\mitalteli\ResearchTasksReportNamespace\ResearchTasksR
 
 // Auto-load class files
 spl_autoload_register(function ($class) {
-    if ((strpos($class, "\mitalteli\\")) && (!preg_match('/ResearchTasksReportModule$/', $class))) {
-        $base_NS_len=strlen(__NAMESPACE__)+1;
-        $classTmp=substr($class, $base_NS_len);
-        $name = dirname(__FILE__) . "/app/" . str_replace('\\', '/',$classTmp) . '.php';
-        #error_log("AUTOLOAD CLASS: class:[$class], len:[$base_NS_len], file:[$name]");
-        include $name;
+    $prefix = __NAMESPACE__ . '\\';
+
+    if (strncmp($class, $prefix, strlen($prefix)) !== 0 || preg_match('/ResearchTasksReportModule$/', $class)) {
+        return;
+    }
+
+    $relative = substr($class, strlen($prefix));
+
+    // Defensive: class names only (letters, digits, underscore and namespace separators).
+    if (preg_match('/^[A-Za-z0-9_\\\\]+$/', $relative) !== 1) {
+        return;
+    }
+
+    $name = __DIR__ . '/app/' . str_replace('\\', '/', $relative) . '.php';
+
+    if (is_file($name)) {
+        require $name;
     }
 }, true, true);  
 

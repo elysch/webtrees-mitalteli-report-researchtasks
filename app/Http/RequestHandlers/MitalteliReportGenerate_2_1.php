@@ -21,6 +21,7 @@ namespace vendor\WebtreesModules\mitalteli\ResearchTasksReportNamespace\Http\Req
 
 use vendor\WebtreesModules\mitalteli\ResearchTasksReportNamespace\Report\MitalteliReportParserGenerate_2_1;
 use vendor\WebtreesModules\mitalteli\ResearchTasksReportNamespace\Report\MitalteliHtmlRenderer;
+use vendor\WebtreesModules\mitalteli\ResearchTasksReportNamespace\Report\MitalteliObfuscator;
 use vendor\WebtreesModules\mitalteli\ResearchTasksReportNamespace\Report\MitalteliPdfRenderer_2_1;
 use Fisharebest\Webtrees\Http\RequestHandlers\ReportGenerate;
 use Fisharebest\Webtrees\Http\RequestHandlers\ReportListPage;
@@ -55,7 +56,7 @@ class MitalteliReportGenerate_2_1 extends ReportGenerate
         
         try {
             $property = $reflectionClass->getProperty($attribute_name);
-            $property->setAccessible(true); // Make the private property accessible
+            if (PHP_VERSION_ID < 80100) { $property->setAccessible(true); } // Make the private property accessible
             
             // 2. Extract the value from the current instance ($this) 
             // but under the context of the class declared in step 1
@@ -80,11 +81,9 @@ class MitalteliReportGenerate_2_1 extends ReportGenerate
         $report = Validator::attributes($request)->string('report');
         $module = $this->getFromParentPrivatePropertyWithReflection('module_service')->findByName($report);
 
-        $coreWebtreesCustomizationDir = ResearchTasksReportModule::getCoreWebtreesCustomizationDirectory();
-
         // Check if the report string contains the module directory path
         // if not running from this module, redirect to the standard ReportGenerate handler
-        if (!str_contains($report, $coreWebtreesCustomizationDir)) {
+        if (!$module instanceof ResearchTasksReportModule) {
             return parent::{__FUNCTION__}($request);
         }
 
@@ -94,17 +93,16 @@ class MitalteliReportGenerate_2_1 extends ReportGenerate
 
         Auth::checkComponentAccess($module, ModuleReportInterface::class, $tree, $user);
 
-        $varnames  = Validator::queryParams($request)->array('varnames');
-        $vars      = Validator::queryParams($request)->array('vars');
-        $variables = [];
+        $xml_filename = $module->resourcesFolder() . $module->xmlFilename();
 
-        foreach ($varnames as $name) {
-            $variables[$name]['id'] = $vars[$name] ?? '';
+        // Security: only inputs declared in the report XML are accepted, normalised by type.
+        $variables = [];
+        foreach (ResearchTasksReportModule::sanitizeReportVars($xml_filename, Validator::queryParams($request)->array('vars')) as $name => $value) {
+            $variables[$name]['id'] = $value;
         }
 
-        $xml_filename = $module->resourcesFolder() . $module->xmlFilename();
-        $format       = Validator::queryParams($request)->string('format');
-        $destination  = Validator::queryParams($request)->string('destination');
+        $format      = ResearchTasksReportModule::normalizeFormat(Validator::queryParams($request)->string('format'));
+        $destination = ResearchTasksReportModule::normalizeDestination(Validator::queryParams($request)->string('destination'));
 
         $user->setPreference('default-report-destination', $destination);
         $user->setPreference('default-report-format', $format);
@@ -116,6 +114,13 @@ class MitalteliReportGenerate_2_1 extends ReportGenerate
                 new MitalteliReportParserGenerate_2_1($xml_filename, new MitalteliHtmlRenderer(), $variables, $tree);
                 $html = ob_get_clean();
 
+                // DEBUG/PRIVACY MODE (see the SECURITY NOTE in MitalteliReportGenerate_2_2): public on purpose.
+                // FIX: this handler used to ignore the switch and return the REAL report although the user
+                // asked for the obfuscated one (fail-open). It is now honoured, exactly like in 2.2/2.3.
+                if (($request->getQueryParams()['debug_obfuscate'] ?? '') === '1') {
+                    $html = (new MitalteliObfuscator())->obfuscateHtml($html);
+                }
+
                 $this->layout = 'layouts/report';
 
                 $response = $this->viewResponse('report-page', [
@@ -124,20 +129,27 @@ class MitalteliReportGenerate_2_1 extends ReportGenerate
                 ]);
 
                 if ($destination === 'download') {
-                    $response = $response->withHeader('content-disposition', 'attachment; filename="' . addcslashes($report, '"') . '.html"');
+                    $response = $response->withHeader('content-disposition', 'attachment; filename="' . ResearchTasksReportModule::safeDownloadName($report) . '.html"');
                 }
 
                 return $response;
 
             case 'PDF':
+                $pdf_renderer = new MitalteliPdfRenderer_2_1();
+                // DEBUG/PRIVACY MODE (see the SECURITY NOTE in MitalteliReportGenerate_2_2): public on purpose.
+                // FIX: this handler used to ignore the switch and return the REAL report although the user
+                // asked for the obfuscated one (fail-open). It is now honoured, exactly like in 2.2/2.3.
+                if (($request->getQueryParams()['debug_obfuscate'] ?? '') === '1') {
+                    $pdf_renderer->debug_obfuscate = true;
+                }
                 ob_start();
-                new MitalteliReportParserGenerate_2_1($xml_filename, new MitalteliPdfRenderer_2_1(), $variables, $tree);
+                new MitalteliReportParserGenerate_2_1($xml_filename, $pdf_renderer, $variables, $tree);
                 $pdf = ob_get_clean();
 
                 $headers = ['content-type' => 'application/pdf'];
 
                 if ($destination === 'download') {
-                    $headers['content-disposition'] = 'attachment; filename="' . addcslashes($report, '"') . '.pdf"';
+                    $headers['content-disposition'] = 'attachment; filename="' . ResearchTasksReportModule::safeDownloadName($report) . '.pdf"';
                 }
 
                 return response($pdf, StatusCodeInterface::STATUS_OK, $headers);

@@ -51,6 +51,9 @@ class MitalteliPdfRenderer_2_0 extends PdfRenderer
         #parent::{__FUNCTION__}();
     }    
 
+    /** When true, all text output is replaced with random letters of same length. */
+    public bool $debug_obfuscate = false;
+
     /**
      * PDF Setup - ReportPdf
      *
@@ -83,6 +86,8 @@ class MitalteliPdfRenderer_2_0 extends PdfRenderer
         $this->tcpdf->setFontSubsetting($this->getFromParentPrivateConstantWithReflection('SUBSETTING'));
         $this->tcpdf->setCompression($this->getFromParentPrivateConstantWithReflection('COMPRESSION'));
         $this->tcpdf->setRTL($this->rtl);
+        // Propagate debug_obfuscate flag to tcpdf wrapper (same as MitalteliPdfRenderer_2_1).
+        $this->tcpdf->debug_obfuscate = $this->debug_obfuscate;
         $this->tcpdf->setCreator(Webtrees::NAME . ' ' . Webtrees::VERSION);
         $this->tcpdf->setAuthor($this->rauthor);
         $this->tcpdf->setTitle($this->title);

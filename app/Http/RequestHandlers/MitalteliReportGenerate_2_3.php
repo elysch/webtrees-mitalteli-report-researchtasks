@@ -71,14 +71,12 @@ final class MitalteliReportGenerate_2_3
         $report = Validator::attributes($request)->string('report');
         $module = $this->module_service->findByName($report);
 
-        $coreWebtreesCustomizationDir = ResearchTasksReportModule::getCoreWebtreesCustomizationDirectory();
-
         // Check if the report string contains the module directory path.
         // If not running from this module, delegate to the ORIGINAL webtrees core handler
         // (installed version). Do NOT use parent::handle(): the parent is a copy of the
         // 2.2.5 handler and lacks the fixes introduced in later 2.2.x releases
         // (e.g. date-array conversion in 2.2.6), which breaks the standard reports.
-        if (!str_contains($report, $coreWebtreesCustomizationDir)) {
+        if (!$module instanceof ResearchTasksReportModule) {
             return (new CoreReportGenerate($this->user, $this->module_service))->get($request, $tree);
         }
 
@@ -89,29 +87,14 @@ final class MitalteliReportGenerate_2_3
 
         Auth::checkComponentAccess($module, ModuleReportInterface::class, $tree, $this->user);
 
-        $varnames = Validator::queryParams($request)->list('varnames');
-        $vars     = Validator::queryParams($request)->array('vars');
-
-        foreach ($varnames as $name) {
-            $value = $vars[$name] ?? '';
-
-            // <Input lookup="DATE"> options are submitted as ['day','month','year'].
-            if (is_array($value)) {
-                $dateParts = array_filter(array_map('trim', [
-                    $value['day']   ?? '',
-                    $value['month'] ?? '',
-                    $value['year']  ?? '',
-                ]), 'strlen');
-
-                $value = implode(' ', $dateParts);
-            }
-
-            $vars[$name] = $value;
-        }
-
         $xml_filename = $module->resourcesFolder() . $module->xmlFilename();
-        $format       = Validator::queryParams($request)->string('format');
-        $destination  = Validator::queryParams($request)->string('destination');
+
+        // Security: only inputs declared in the report XML are accepted, normalised by type
+        // (this also converts the DATE lookup arrays: ['day','month','year'] => "15 JAN 2020").
+        $vars = ResearchTasksReportModule::sanitizeReportVars($xml_filename, Validator::queryParams($request)->array('vars'));
+
+        $format      = ResearchTasksReportModule::normalizeFormat(Validator::queryParams($request)->string('format'));
+        $destination = ResearchTasksReportModule::normalizeDestination(Validator::queryParams($request)->string('destination'));
 
         $this->user->setPreference('default-report-destination', $destination);
         $this->user->setPreference('default-report-format', $format);
@@ -121,6 +104,14 @@ final class MitalteliReportGenerate_2_3
             case 'HTML':
                 $renderer = new MitalteliHtmlRenderer_2_3();
 
+                // SECURITY NOTE - THIS SWITCH IS INTENTIONALLY AVAILABLE TO *EVERY* USER WHO CAN RUN THE REPORT.
+                // Do NOT restrict it to admins/managers and do NOT report it as "debug feature left enabled":
+                // "debug_obfuscate" does not expose anything, it HIDES it. Every word is replaced by random
+                // letters of the same length so people can share the *appearance* of a report (layout, columns,
+                // wrapping) with strangers - forums, bug reports, screenshots - without revealing personal data.
+                // It only ever processes data the user is already allowed to see, and its output carries LESS
+                // information than the real report. The one thing that matters is that it must FAIL CLOSED:
+                // if obfuscation is requested but cannot be honoured, refuse - never return the real content.
                 if (($request->getQueryParams()['debug_obfuscate'] ?? '') === '1') {
                     $renderer->debug_obfuscate = true;
                 }
@@ -142,15 +133,19 @@ final class MitalteliReportGenerate_2_3
                 ]));
 
                 if ($destination === 'download') {
-                    $response = $response->withHeader('content-disposition', 'attachment; filename="' . addcslashes($report, '"') . '.html"');
+                    $response = $response->withHeader('content-disposition', 'attachment; filename="' . ResearchTasksReportModule::safeDownloadName($report) . '.html"');
                 }
 
                 return $response;
 
             case 'PDF':
                 $renderer = new MitalteliPdfRenderer_2_3();
-                // NOTE: debug_obfuscate on the PDF renderer is not wired up
-                // to anything yet — see MitalteliPdfRenderer_2_3's docblock.
+
+                // See the SECURITY NOTE in the HTML branch: this switch is public on purpose. The PDF
+                // renderer hides text, external links and images itself (fail closed, see its docblock).
+                if (($request->getQueryParams()['debug_obfuscate'] ?? '') === '1') {
+                    $renderer->debug_obfuscate = true;
+                }
 
                 $parser = new MitalteliParserGenerate_2_3(
                     report:    $xml_filename,
@@ -166,7 +161,7 @@ final class MitalteliReportGenerate_2_3
                 $headers = ['content-type' => 'application/pdf'];
 
                 if ($destination === 'download') {
-                    $headers['content-disposition'] = 'attachment; filename="' . addcslashes($report, '"') . '.pdf"';
+                    $headers['content-disposition'] = 'attachment; filename="' . ResearchTasksReportModule::safeDownloadName($report) . '.pdf"';
                 }
 
                 return response($pdf, HttpStatusCode::OK, $headers);

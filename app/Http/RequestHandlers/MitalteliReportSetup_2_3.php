@@ -63,12 +63,12 @@ final class MitalteliReportSetup_2_3
 
         $xref = Validator::queryParams($request)->isXref()->string('xref', '');
 
-        // Individual preseleccionado (p. ej. el individuo del usuario autenticado).
+        // Preselected individual (e.g. the logged-in user's own individual).
         $indi_default = Registry::individualFactory()->make($xref, $tree);
 
-        // Familia preseleccionada: la del propio xref si es una familia; si es un
-        // individuo, su primera familia como cónyuge o, si no tiene, la familia
-        // de la que es hijo/a. Si no existe ninguna, el selector queda vacío.
+        // Preselected family: the xref's own family if it is a family; if it is an
+        // individual, their first family as a spouse or, failing that, the family
+        // they are a child of. If there is none, the selector stays empty.
         $fam_default = Registry::familyFactory()->make($xref, $tree);
         if ($fam_default === null && $indi_default !== null) {
             $fam_default = $indi_default->spouseFamilies()->first()

@@ -20,6 +20,11 @@ declare(strict_types=1);
 namespace vendor\WebtreesModules\mitalteli\ResearchTasksReportNamespace\Report;
 
 /**
+ * PURPOSE (read before "fixing" anything): this is a PRIVACY feature, not a debugging aid that leaks.
+ * It exists so users can share the look of a report with strangers WITHOUT revealing its content,
+ * which is why it is deliberately available to every user who can run the report. It hides data; it
+ * never reveals more than the real report would. It must fail closed (refuse rather than output real data).
+ *
  * Text obfuscation utility for debug mode.
  *
  * Replaces each word with random letters of the exact same character length,
@@ -30,8 +35,8 @@ namespace vendor\WebtreesModules\mitalteli\ResearchTasksReportNamespace\Report;
  */
 class MitalteliObfuscator
 {
-    private static array $vocales_mayus = ['Á', 'É', 'Í', 'Ó', 'Ú'];
-    private static array $vocales_minus = ['á', 'é', 'í', 'ó', 'ú'];
+    private static array $accented_upper = ['Á', 'É', 'Í', 'Ó', 'Ú'];
+    private static array $accented_lower = ['á', 'é', 'í', 'ó', 'ú'];
 
     private int $counter = 0;
 
@@ -50,8 +55,8 @@ class MitalteliObfuscator
 
             if ($this->counter % 5 === 0) {
                 $result .= ($this->counter % 75 === 0)
-                    ? self::$vocales_mayus[array_rand(self::$vocales_mayus)]
-                    : self::$vocales_minus[array_rand(self::$vocales_minus)];
+                    ? self::$accented_upper[array_rand(self::$accented_upper)]
+                    : self::$accented_lower[array_rand(self::$accented_lower)];
             } else {
                 $result .= ($this->counter % 75 === 0)
                     ? chr(mt_rand(65, 90))
@@ -70,10 +75,40 @@ class MitalteliObfuscator
     {
         $self = $this;
         return preg_replace_callback(
-            '/[^\s\xc2\xa0&<>]+/u',
+            '/[^\s\x{00A0}&<>]+/u',
             fn($w) => $self->obfuscateWord($w[0]),
             $text
         );
+    }
+
+    /**
+     * Text-node obfuscation never reaches ATTRIBUTES, which can carry real data
+     * (2.3 auto-links names: href="https://site/tree/<tree-name>/individual/<xref>"; title/alt text;
+     * inline data: images). Neutralise them so an obfuscated report does not leak through markup.
+     * In-page anchors (href="#footnote1") are kept so footnote links keep working.
+     */
+    public function scrubAttributes(string $html): string
+    {
+        $html = preg_replace_callback(
+            '/(\s)(href|title|alt)\s*=\s*("|\')(.*?)\3/is',
+            static function (array $m): string {
+                $name = strtolower($m[2]);
+                if ($name === 'href' && strncmp(ltrim($m[4]), '#', 1) === 0) {
+                    return $m[0];
+                }
+                return $m[1] . $m[2] . '=' . $m[3] . ($name === 'href' ? '#' : '') . $m[3];
+            },
+            $html
+        ) ?? $html;
+
+        return preg_replace_callback(
+            '/(\ssrc\s*=\s*)("|\')data:[^"\']*\2/i',
+            static function (array $m): string {
+                // 1x1 transparent GIF: hides the picture, keeps the box (inline width/height survive)
+                return $m[1] . $m[2] . 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7' . $m[2];
+            },
+            $html
+        ) ?? $html;
     }
 
     /**
@@ -83,11 +118,12 @@ class MitalteliObfuscator
     public function obfuscateHtml(string $html): string
     {
         $self = $this;
+        $html = $this->scrubAttributes($html);
         return preg_replace_callback(
             '/>([\\s]*[^<\\s][^<]*?[\\s]*)</',
             function ($m) use ($self) {
                 return '>' . preg_replace_callback(
-                    '/[^\\s\\xc2\\xa0&<>]+/u',
+                    '/[^\\s\\x{00A0}&<>]+/u',
                     fn($w) => $self->obfuscateWord($w[0]),
                     $m[1]
                 ) . '<';

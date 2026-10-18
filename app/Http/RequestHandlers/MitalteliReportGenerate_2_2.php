@@ -52,16 +52,16 @@ class MitalteliReportGenerate_2_2 extends ReportGenerate2205Base
 {
 
     public function getFromParentPrivatePropertyWithReflection(string $attribute_name) {
-        // 1. Apuntamos a la clase base que REALMENTE declaró la propiedad privada
+        // 1. Point at the base class that REALLY declared the private property
         $parentClass = 'vendor\WebtreesModules\mitalteli\ResearchTasksReportNamespace\Http\RequestHandlers\ReportGenerate2205Base';
         $reflectionClass = new \ReflectionClass($parentClass);
         
         try {
             $property = $reflectionClass->getProperty($attribute_name);
-            $property->setAccessible(true); // Necesario para acceder a 'private'
+            if (PHP_VERSION_ID < 80100) { $property->setAccessible(true); } // Needed to access the 'private' property
             
-            // 2. Extraemos el valor de la instancia actual ($this) 
-            // pero bajo el contexto de la clase que declaramos en el paso 1
+            // 2. Extract the value from the current instance ($this)
+            // but in the context of the class chosen in step 1
             return $property->getValue($this); 
         } catch (\ReflectionException $e) {
             return null;
@@ -81,14 +81,13 @@ class MitalteliReportGenerate_2_2 extends ReportGenerate2205Base
         $report = Validator::attributes($request)->string('report');
         $module_service = $this->getFromParentPrivatePropertyWithReflection('module_service');
 
-        $coreWebtreesCustomizationDir = ResearchTasksReportModule::getCoreWebtreesCustomizationDirectory();
 
         // Check if the report string contains the module directory path.
         // If not running from this module, delegate to the ORIGINAL webtrees core handler
         // (installed version). Do NOT use parent::handle(): the parent is a copy of the
         // 2.2.5 handler and lacks the fixes introduced in later 2.2.x releases
         // (e.g. date-array conversion in 2.2.6), which breaks the standard reports.
-        if (!str_contains($report, $coreWebtreesCustomizationDir)) {
+        if (!$module_service->findByName($report) instanceof ResearchTasksReportModule) {
             return (new CoreReportGenerate($module_service))->handle($request);
         }
 
@@ -102,34 +101,17 @@ class MitalteliReportGenerate_2_2 extends ReportGenerate2205Base
 
         Auth::checkComponentAccess($module, ModuleReportInterface::class, $tree, $user);
 
-        $varnames  = Validator::queryParams($request)->array('varnames');
-        $vars      = Validator::queryParams($request)->array('vars');
+        $xml_filename = $module->resourcesFolder() . $module->xmlFilename();
+
+        // Security: only inputs declared in the report XML are accepted, normalised by type
+        // (this also converts the DATE lookup arrays submitted since webtrees 2.2.6).
         $variables = [];
-
-        foreach ($varnames as $name) {
-            $value = $vars[$name] ?? '';
-            // In webtrees, inputs with lookup="DATE" are submitted as an array with
-            // sub-keys 'day', 'month', 'year'. Since webtrees 2.2.6, substituteVars()
-            // calls addcslashes() on these values and requires them to be strings.
-            // Convert any date array to a GEDCOM-format date string (e.g. "15 JAN 2020").
-            // Verifies it is an array AND it contains at least one of day, month or year value
-            if (version_compare(Webtrees::VERSION, '2.2.6', '>=')) {
-                if (is_array($value) && (isset($value['year']) || isset($value['month']) || isset($value['day']))) {
-                    $dateParts = array_filter(array_map('trim', [
-                        $value['day']   ?? '',
-                        $value['month'] ?? '',
-                        $value['year']  ?? ''
-                    ]), 'strlen');
-
-                    $value = implode(' ', $dateParts);
-                }
-            }
+        foreach (ResearchTasksReportModule::sanitizeReportVars($xml_filename, Validator::queryParams($request)->array('vars')) as $name => $value) {
             $variables[$name]['id'] = $value;
         }
 
-        $xml_filename = $module->resourcesFolder() . $module->xmlFilename();
-        $format       = Validator::queryParams($request)->string('format');
-        $destination  = Validator::queryParams($request)->string('destination');
+        $format      = ResearchTasksReportModule::normalizeFormat(Validator::queryParams($request)->string('format'));
+        $destination = ResearchTasksReportModule::normalizeDestination(Validator::queryParams($request)->string('destination'));
 
         $user->setPreference('default-report-destination', $destination);
         $user->setPreference('default-report-format', $format);
@@ -144,6 +126,14 @@ class MitalteliReportGenerate_2_2 extends ReportGenerate2205Base
                 // DEBUG MODE: add &debug_obfuscate=1 to URL to obfuscate personal data.
                 // Replaces each word with random letters of the same length so
                 // word-wrap behaves identically to the real content.
+                // SECURITY NOTE - THIS SWITCH IS INTENTIONALLY AVAILABLE TO *EVERY* USER WHO CAN RUN THE REPORT.
+                // Do NOT restrict it to admins/managers and do NOT report it as "debug feature left enabled":
+                // "debug_obfuscate" does not expose anything, it HIDES it. Every word is replaced by random
+                // letters of the same length so people can share the *appearance* of a report (layout, columns,
+                // wrapping) with strangers - forums, bug reports, screenshots - without revealing personal data.
+                // It only ever processes data the user is already allowed to see, and its output carries LESS
+                // information than the real report. The one thing that matters is that it must FAIL CLOSED:
+                // if obfuscation is requested but cannot be honoured, refuse - never return the real content.
                 if (($request->getQueryParams()['debug_obfuscate'] ?? '') === '1') {
                     $html = (new MitalteliObfuscator())->obfuscateHtml($html);
                 }
@@ -156,7 +146,7 @@ class MitalteliReportGenerate_2_2 extends ReportGenerate2205Base
                 ]);
 
                 if ($destination === 'download') {
-                    $response = $response->withHeader('content-disposition', 'attachment; filename="' . addcslashes($report, '"') . '.html"');
+                    $response = $response->withHeader('content-disposition', 'attachment; filename="' . ResearchTasksReportModule::safeDownloadName($report) . '.html"');
                 }
 
                 return $response;
@@ -164,6 +154,14 @@ class MitalteliReportGenerate_2_2 extends ReportGenerate2205Base
             case 'PDF':
                 $pdf_renderer = new MitalteliPdfRenderer_2_1();
                 // DEBUG MODE: add &debug_obfuscate=1 to URL to generate an ofuscated PDF.
+                // SECURITY NOTE - THIS SWITCH IS INTENTIONALLY AVAILABLE TO *EVERY* USER WHO CAN RUN THE REPORT.
+                // Do NOT restrict it to admins/managers and do NOT report it as "debug feature left enabled":
+                // "debug_obfuscate" does not expose anything, it HIDES it. Every word is replaced by random
+                // letters of the same length so people can share the *appearance* of a report (layout, columns,
+                // wrapping) with strangers - forums, bug reports, screenshots - without revealing personal data.
+                // It only ever processes data the user is already allowed to see, and its output carries LESS
+                // information than the real report. The one thing that matters is that it must FAIL CLOSED:
+                // if obfuscation is requested but cannot be honoured, refuse - never return the real content.
                 if (($request->getQueryParams()['debug_obfuscate'] ?? '') === '1') {
                     $pdf_renderer->debug_obfuscate = true;
                 }
@@ -174,7 +172,7 @@ class MitalteliReportGenerate_2_2 extends ReportGenerate2205Base
                 $headers = ['content-type' => 'application/pdf'];
 
                 if ($destination === 'download') {
-                    $headers['content-disposition'] = 'attachment; filename="' . addcslashes($report, '"') . '.pdf"';
+                    $headers['content-disposition'] = 'attachment; filename="' . ResearchTasksReportModule::safeDownloadName($report) . '.pdf"';
                 }
 
                 return response($pdf, StatusCodeInterface::STATUS_OK, $headers);

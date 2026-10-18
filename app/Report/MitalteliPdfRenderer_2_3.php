@@ -24,21 +24,20 @@ namespace vendor\WebtreesModules\mitalteli\ResearchTasksReportNamespace\Report;
  * `final`, so we extend the open AbstractRenderer + ElementFactoryInterface
  * + PdfRenderTargetInterface surface instead, mirroring core's PdfRenderer.
  *
- * ONE THING IS DELIBERATELY NOT PORTED YET: $debug_obfuscate / the PDF
- * obfuscation feature.
- *
- * In webtrees <= 2.2.x, obfuscation worked by swapping the internal `tcpdf`
- * property for MitalteliTcpdfWrapper (a subclass of the old TCPDF engine)
- * that intercepted every low-level text-write call. In >= 2.3, the PDF
- * backend was replaced entirely: it now goes through the third-party
- * `tecnickcom/tc-lib-pdf` library via `Fisharebest\Webtrees\Report\TcLibPdfAdaptor`,
- * which is itself `final` and cannot be subclassed or swapped the same way.
- *
- * The correct place to reintroduce obfuscation for 2.3 is one layer up, in
- * MitalteliParserGenerate_2_3 (at the point where element text is built via
- * Element::addText()), so the same obfuscation logic covers both the HTML
- * and PDF backends uniformly. That is a separate, deliberate change and is
- * left as a follow-up rather than guessed at here.
+ * OBFUSCATION ($debug_obfuscate) - supported, and public on purpose:
+ * it is a privacy feature that HIDES data so a report's look can be shared with strangers, so every
+ * user who can run the report may use it (see README). The 2.2 approach (swapping the TCPDF wrapper)
+ * is impossible here because TcLibPdfAdaptor is `final`; instead every output path of
+ * PdfRenderTargetInterface that can carry data is neutralised in this class, AFTER layout, so wrapping
+ * and pagination match the real report:
+ *   - drawTextBlock(): text replaced char-by-char with width-matched random letters
+ *     (MitalteliPdfTextObfuscator);
+ *   - addLinkArea():   external URLs (they contain the tree name and XREFs) are dropped; only
+ *                      internal footnote links, which are numeric ids, are kept;
+ *   - drawImage():     not drawn;
+ *   - PDF metadata (title/description/author) comes from the static report definition, no personal data.
+ * FAIL CLOSED: if a new text/link/image path is ever added to PdfRenderTargetInterface, it MUST be
+ * handled here too, otherwise obfuscated PDFs would leak.
  */
 
 use Com\Tecnick\Pdf\Tcpdf;
@@ -82,8 +81,26 @@ class MitalteliPdfRenderer_2_3 extends AbstractRenderer implements ElementFactor
 
     private readonly PdfWriter $pdf_writer;
 
-    /** @see class docblock above — not wired up to anything yet. */
+    /** When true, the PDF is produced with all personal data hidden (see class docblock). */
     public bool $debug_obfuscate = false;
+
+    private ?MitalteliPdfTextObfuscator $text_obfuscator = null;
+
+    /** Width of $text in the CURRENT PDF font. Protected so it can be replaced in tests. */
+    protected function measureForObfuscation(string $text): float
+    {
+        return $this->adaptor->getStringWidth($text);
+    }
+
+    private function obfuscateBlockText(string $text): string
+    {
+        $this->text_obfuscator ??= new MitalteliPdfTextObfuscator(fn (string $s): float => $this->measureForObfuscation($s));
+
+        // The key identifies the font actually in use (family/style/size => different widths).
+        $font_key = (string) round($this->measureForObfuscation('abcdefghijklmnopqrstuvwxyz'), 4);
+
+        return $this->text_obfuscator->obfuscate($text, $font_key);
+    }
 
     public function __construct()
     {
@@ -283,6 +300,10 @@ class MitalteliPdfRenderer_2_3 extends AbstractRenderer implements ElementFactor
 
     public function drawImage(string $file, float $x, float $y, float $width, float $height): void
     {
+        if ($this->debug_obfuscate) {
+            return; // pictures can show real people: never draw them in an obfuscated report
+        }
+
         $this->adaptor->drawImage($file, $x, $y, $width, $height);
     }
 
@@ -298,11 +319,21 @@ class MitalteliPdfRenderer_2_3 extends AbstractRenderer implements ElementFactor
 
     public function drawTextBlock(string $text, float $x, float $y, float $width, float $height, string $align, float $line_height, bool $with_padding = true): void
     {
+        if ($this->debug_obfuscate) {
+            $text = $this->obfuscateBlockText($text);
+        }
+
         $this->adaptor->drawTextBlock($text, $x, $y, $width, $height, $align, $line_height, $with_padding);
     }
 
     public function addLinkArea(float $x, float $y, float $width, float $height, string $url): void
     {
+        // Internal links (footnotes) are numeric registry ids; anything else is an external URL that
+        // contains the tree name and XREFs, so it is dropped when obfuscating.
+        if ($this->debug_obfuscate && !ctype_digit($url)) {
+            return;
+        }
+
         $this->adaptor->addLinkArea($x, $y, $width, $height, $url);
     }
 

@@ -4,6 +4,7 @@ namespace vendor\WebtreesModules\mitalteli\ResearchTasksReportNamespace\Http\Req
 
 use vendor\WebtreesModules\mitalteli\ResearchTasksReportNamespace\Report\MitalteliReportParserGenerate_2_0;
 use vendor\WebtreesModules\mitalteli\ResearchTasksReportNamespace\Report\MitalteliHtmlRenderer;
+use vendor\WebtreesModules\mitalteli\ResearchTasksReportNamespace\Report\MitalteliObfuscator;
 use vendor\WebtreesModules\mitalteli\ResearchTasksReportNamespace\Report\MitalteliPdfRenderer_2_0;
 use Fisharebest\Webtrees\Http\RequestHandlers\ReportGenerate;
 use Fisharebest\Webtrees\Http\RequestHandlers\ReportListPage;
@@ -43,16 +44,16 @@ class MitalteliReportGenerate_2_0 extends ReportGenerate
 {
 
     public function getFromParentPrivatePropertyWithReflection(string $attribute_name) {
-        // 1. Apuntamos a la clase base que REALMENTE declaró la propiedad privada
+        // 1. Point at the base class that REALLY declared the private property
         $parentClass = 'Fisharebest\Webtrees\Http\RequestHandlers\ReportGenerate';
         $reflectionClass = new \ReflectionClass($parentClass);
         
         try {
             $property = $reflectionClass->getProperty($attribute_name);
-            $property->setAccessible(true); // Necesario para acceder a 'private'
+            if (PHP_VERSION_ID < 80100) { $property->setAccessible(true); } // Needed to access the 'private' property
             
-            // 2. Extraemos el valor de la instancia actual ($this) 
-            // pero bajo el contexto de la clase que declaramos en el paso 1
+            // 2. Extract the value from the current instance ($this)
+            // but in the context of the class chosen in step 1
             return $property->getValue($this); 
         } catch (\ReflectionException $e) {
             return null;
@@ -79,11 +80,9 @@ class MitalteliReportGenerate_2_0 extends ReportGenerate
         $report = $request->getAttribute('report');
         $module = $this->getFromParentPrivatePropertyWithReflection('module_service')->findByName($report);
 
-        $coreWebtreesCustomizationDir = ResearchTasksReportModule::getCoreWebtreesCustomizationDirectory();
-
         // Check if the report string contains the module directory path
         // if not running from this module, redirect to the standard ReportGenerate handler
-        if (!str_contains($report, $coreWebtreesCustomizationDir)) {
+        if (!$module instanceof ResearchTasksReportModule) {
             return parent::{__FUNCTION__}($request);
         }
 
@@ -93,18 +92,16 @@ class MitalteliReportGenerate_2_0 extends ReportGenerate
 
         Auth::checkComponentAccess($module, ModuleReportInterface::class, $tree, $user);
 
-        $varnames  = $request->getQueryParams()['varnames'] ?? [];
-        $vars      = $request->getQueryParams()['vars'] ?? [];
-        $variables = [];
-
-        foreach ($varnames as $name) {
-            $variables[$name]['id'] = $vars[$name] ?? '';
-        }
-
         $xml_filename = $module->resourcesFolder() . $module->xmlFilename();
 
-        $format      = $request->getQueryParams()['format'] ?? '';
-        $destination = $request->getQueryParams()['destination'] ?? '';
+        // Security: only inputs declared in the report XML are accepted, normalised by type.
+        $variables = [];
+        foreach (ResearchTasksReportModule::sanitizeReportVars($xml_filename, (array) ($request->getQueryParams()['vars'] ?? [])) as $name => $value) {
+            $variables[$name]['id'] = $value;
+        }
+
+        $format      = ResearchTasksReportModule::normalizeFormat($request->getQueryParams()['format'] ?? '');
+        $destination = ResearchTasksReportModule::normalizeDestination($request->getQueryParams()['destination'] ?? '');
 
         $user->setPreference('default-report-destination', $destination);
         $user->setPreference('default-report-format', $format);
@@ -116,6 +113,13 @@ class MitalteliReportGenerate_2_0 extends ReportGenerate
                 new MitalteliReportParserGenerate_2_0($xml_filename, new MitalteliHtmlRenderer(), $variables, $tree, $data_filesystem);
                 $html = ob_get_clean();
 
+                // DEBUG/PRIVACY MODE (see the SECURITY NOTE in MitalteliReportGenerate_2_2): public on purpose.
+                // FIX: this handler used to ignore the switch and return the REAL report although the user
+                // asked for the obfuscated one (fail-open). It is now honoured, exactly like in 2.2/2.3.
+                if (($request->getQueryParams()['debug_obfuscate'] ?? '') === '1') {
+                    $html = (new MitalteliObfuscator())->obfuscateHtml($html);
+                }
+
                 $this->layout = 'layouts/report';
 
                 $response = $this->viewResponse('report-page', [
@@ -124,20 +128,27 @@ class MitalteliReportGenerate_2_0 extends ReportGenerate
                 ]);
 
                 if ($destination === 'download') {
-                    $response = $response->withHeader('Content-Disposition', 'attachment; filename="' . addcslashes($report, '"') . '.html"');
+                    $response = $response->withHeader('Content-Disposition', 'attachment; filename="' . ResearchTasksReportModule::safeDownloadName($report) . '.html"');
                 }
 
                 return $response;
 
             case 'PDF':
+                $pdf_renderer = new MitalteliPdfRenderer_2_0();
+                // DEBUG/PRIVACY MODE (see the SECURITY NOTE in MitalteliReportGenerate_2_2): public on purpose.
+                // FIX: this handler used to ignore the switch and return the REAL report although the user
+                // asked for the obfuscated one (fail-open). It is now honoured, exactly like in 2.2/2.3.
+                if (($request->getQueryParams()['debug_obfuscate'] ?? '') === '1') {
+                    $pdf_renderer->debug_obfuscate = true;
+                }
                 ob_start();
-                new MitalteliReportParserGenerate_2_0($xml_filename, new MitalteliPdfRenderer_2_0(), $variables, $tree, $data_filesystem);
+                new MitalteliReportParserGenerate_2_0($xml_filename, $pdf_renderer, $variables, $tree, $data_filesystem);
                 $pdf = ob_get_clean();
 
                 $headers = ['Content-Type' => 'application/pdf'];
 
                 if ($destination === 'download') {
-                    $headers['Content-Disposition'] = 'attachment; filename="' . addcslashes($report, '"') . '.pdf"';
+                    $headers['Content-Disposition'] = 'attachment; filename="' . ResearchTasksReportModule::safeDownloadName($report) . '.pdf"';
                 }
 
                 return response($pdf, StatusCodeInterface::STATUS_OK, $headers);

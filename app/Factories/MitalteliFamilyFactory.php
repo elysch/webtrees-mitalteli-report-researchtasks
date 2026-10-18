@@ -10,16 +10,16 @@ use Fisharebest\Webtrees\Registry;
 use Fisharebest\Webtrees\Tree;
 
 /**
- * Factoría de familias usada SOLO mientras se construye la página de parámetros
- * del reporte en webtrees 2.0 - 2.2 (ver MitalteliReportSetupPage_Legacy).
+ * Family factory used ONLY while the report parameters page is built on
+ * webtrees 2.0 - 2.2 (see MitalteliReportSetupPage_Legacy).
  *
- * El manejador del núcleo pasa el mismo "xref" de la URL (normalmente el individuo
- * del usuario) a los selectores de individuo y de familia. Como ese xref no es de
- * una familia, el selector de familia quedaba vacío. Aquí, si el xref es de un
- * individuo, se devuelve su primera familia como cónyuge o, si no tiene, la
- * familia de la que es hijo/a.
+ * The core handler passes the same "xref" from the URL (normally the user's
+ * individual) to both the individual and the family selectors. Since that xref
+ * is not a family, the family selector used to be empty. Here, if the xref
+ * belongs to an individual, their first family as a spouse is returned or, if
+ * they have none, the family they are a child of.
  *
- * Se mantiene la sintaxis compatible con PHP 7.3 (webtrees 2.0).
+ * Syntax stays compatible with PHP 7.3 (webtrees 2.0).
  */
 class MitalteliFamilyFactory extends FamilyFactory
 {

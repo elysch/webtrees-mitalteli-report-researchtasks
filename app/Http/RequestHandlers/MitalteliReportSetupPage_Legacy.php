@@ -12,12 +12,12 @@ use Psr\Http\Message\ServerRequestInterface;
 use Psr\Http\Server\RequestHandlerInterface;
 
 /**
- * Página de parámetros del reporte en webtrees 2.0 / 2.1 / 2.2.
+ * Report parameters page on webtrees 2.0 / 2.1 / 2.2.
  *
- * Delega TODO en el manejador del núcleo (ReportSetupPage), de modo que no hay
- * copia de código del núcleo que se desincronice. Lo único que hace es sustituir
- * temporalmente la factoría de familias para que el selector de familia se abra
- * con la familia del individuo preseleccionado (ver MitalteliFamilyFactory).
+ * Delegates EVERYTHING to the core handler (ReportSetupPage), so there is no
+ * copy of core code that could drift out of sync. The only thing it does is
+ * temporarily replace the family factory so that the family selector opens
+ * with the preselected individual's family (see MitalteliFamilyFactory).
  */
 class MitalteliReportSetupPage_Legacy implements RequestHandlerInterface
 {

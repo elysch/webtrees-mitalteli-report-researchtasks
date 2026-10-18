@@ -76,6 +76,31 @@ class MitalteliHtmlRenderer extends HtmlRenderer
         if ($width < 3.0) {
             return $str;
         }
+
+        // The word wrap counts the characters of <a href="..."> tags and may cut the URL (cut=true),
+        // which breaks the link. Swap each opening tag for a short token while wrapping.
+        if (str_contains($this->title, ResearchTasksReportModule::REPORT_TITLE) && str_contains($str, '<a href="')) {
+            $tags      = [];
+            $protected = preg_replace_callback(
+                '~<a href="[^"]*">~',
+                static function (array $m) use (&$tags): string {
+                    $tags[] = $m[0];
+
+                    return "\x01" . (count($tags) - 1) . "\x02";
+                },
+                $str
+            );
+            $wrapped = parent::textWrap($protected ?? $str, $width);
+            // Undo a line break that fell inside a token, then restore the tags.
+            $wrapped = preg_replace_callback("~\x01([0-9\n]+)\x02~", static function (array $m): string {
+                return "\x01" . str_replace("\n", '', $m[1]) . "\x02";
+            }, $wrapped) ?? $wrapped;
+
+            return preg_replace_callback("~\x01([0-9]+)\x02~", static function (array $m) use ($tags): string {
+                return $tags[(int) $m[1]] ?? '';
+            }, $wrapped) ?? $wrapped;
+        }
+
         return parent::textWrap($str, $width);
     }
 

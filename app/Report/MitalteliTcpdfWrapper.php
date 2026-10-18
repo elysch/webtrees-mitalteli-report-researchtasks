@@ -43,7 +43,13 @@ class MitalteliTcpdfWrapper extends TcpdfWrapper
         $tree = "";
         $value = "";
         if (array_key_exists("HTTP_REFERER", $_SERVER)) {
-            $value = filter_var(urldecode($_SERVER["HTTP_REFERER"]), FILTER_SANITIZE_URL);
+            // Only trust a Referer that points to THIS host; otherwise any third-party page
+            // linking to the report could forge the "site : tree" provenance shown in the PDF footer.
+            $ref_host = parse_url((string) $_SERVER["HTTP_REFERER"], PHP_URL_HOST);
+            $own_host = parse_url('//' . ($_SERVER["HTTP_HOST"] ?? ''), PHP_URL_HOST);
+            if (is_string($ref_host) && is_string($own_host) && strcasecmp($ref_host, $own_host) === 0) {
+                $value = (string) preg_replace('/[^A-Za-z0-9\-._~\/?=&:%+,;!*]+/', '', urldecode($_SERVER["HTTP_REFERER"]));
+            }
         }
         $url1 = "";
         $i = strpos($value, "route=");
@@ -128,6 +134,18 @@ class MitalteliTcpdfWrapper extends TcpdfWrapper
     }
 
     /**
+     * Link annotations (individual/family URLs) would reveal real XREFs and the tree name in an
+     * "obfuscated" PDF, so they are not written when debug_obfuscate is set.
+     */
+    public function Link($x, $y, $w, $h, $link, $spaces = 0)
+    {
+        if ($this->debug_obfuscate) {
+            return;
+        }
+        parent::Link($x, $y, $w, $h, $link, $spaces);
+    }
+
+    /**
      * Override Cell to obfuscate text when debug_obfuscate is set.
      * Called by ReportPdfCell::render() for cell elements.
      */
@@ -145,8 +163,12 @@ class MitalteliTcpdfWrapper extends TcpdfWrapper
         $calign = 'T',
         $valign = 'M'
     ): void {
-        if ($this->debug_obfuscate && is_string($txt) && $txt !== '') {
-            $txt = $this->obf()->obfuscateText($txt);
+        if ($this->debug_obfuscate) {
+            // Link annotations carry the real site URL, tree name and XREF: drop them (fail closed).
+            $link = '';
+            if (is_string($txt) && $txt !== '') {
+                $txt = $this->obf()->obfuscateText($txt);
+            }
         }
         parent::Cell($w, $h, $txt, $border, $ln, $align, $fill, $link, $stretch,
             $ignore_min_height, $calign, $valign);

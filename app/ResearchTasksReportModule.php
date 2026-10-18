@@ -31,7 +31,6 @@ use Fisharebest\Webtrees\Webtrees;
 use Fisharebest\Webtrees\Services\ModuleService;
 use Fisharebest\Localization\Translation;
 
-use VERSION;
 
 class ResearchTasksReportModule extends AbstractModule implements ModuleCustomInterface, ModuleReportInterface, ModuleGlobalInterface {
     use ModuleCustomTrait;
@@ -59,9 +58,9 @@ class ResearchTasksReportModule extends AbstractModule implements ModuleCustomIn
     public function boot(): void
     {
         if (version_compare(Webtrees::VERSION, '2.3.0-dev', '>=')) {
-            // La página de PARÁMETROS del reporte (antes de generarlo) usa un
-            // controlador/parser distinto al de generación -- hay que
-            // interceptar los DOS.
+            // The report PARAMETERS page (before generating the report) uses a
+            // different controller/parser than generation -- both have to be
+            // intercepted.
             Registry::container()->bind(
                 CoreReportSetupController_2_3::class,
                 MitalteliReportSetup_2_3::class
@@ -486,4 +485,173 @@ JS
             return app($class);
         }
     }
-};
+
+    /**
+     * Inputs declared in the report XML file.
+     *
+     * @return array<string,array{type:string,lookup:string,default:?string,options:array<int,string>}>
+     */
+    private static function declaredReportInputs(string $xml_filename): array
+    {
+        static $cache = [];
+
+        if (isset($cache[$xml_filename])) {
+            return $cache[$xml_filename];
+        }
+
+        $inputs   = [];
+        $previous = libxml_use_internal_errors(true);
+        $xml      = simplexml_load_file($xml_filename, \SimpleXMLElement::class, LIBXML_NONET);
+        libxml_use_internal_errors($previous);
+
+        if ($xml !== false) {
+            foreach ($xml->xpath('//Input') ?: [] as $input) {
+                $name = (string) $input['name'];
+
+                if ($name === '') {
+                    continue;
+                }
+
+                $options = [];
+                foreach (explode('|', (string) $input['options']) as $option) {
+                    $key = trim(explode('=>', $option, 2)[0]);
+                    if ($key !== '') {
+                        $options[] = $key;
+                    }
+                }
+
+                $inputs[$name] = [
+                    'type'    => (string) $input['type'],
+                    'lookup'  => (string) $input['lookup'],
+                    'default' => isset($input['default']) ? (string) $input['default'] : null,
+                    'options' => $options,
+                ];
+            }
+        }
+
+        return $cache[$xml_filename] = $inputs;
+    }
+
+    /**
+     * Security: build the report variables ONLY from the inputs declared in the report XML,
+     * normalising every value according to its declared type. Anything undeclared is dropped.
+     * This prevents parameter injection into the CONTAINS_R filter string (NEEDLE='...'),
+     * "$var" self-references in the variable substitution loop, and out-of-range select values.
+     *
+     * @param array<mixed> $raw Raw "vars" query parameter
+     *
+     * @return array<string,string> name => sanitised value
+     */
+    public static function sanitizeReportVars(string $xml_filename, array $raw): array
+    {
+        $clean = [];
+
+        foreach (self::declaredReportInputs($xml_filename) as $name => $def) {
+            $value = $raw[$name] ?? '';
+
+            // <Input lookup="DATE"> may be submitted as ['day','month','year'].
+            if (is_array($value)) {
+                $parts = [];
+                foreach (['day', 'month', 'year'] as $part) {
+                    if (isset($value[$part]) && is_scalar($value[$part]) && trim((string) $value[$part]) !== '') {
+                        $parts[] = trim((string) $value[$part]);
+                    }
+                }
+                $value = implode(' ', $parts);
+            }
+
+            $value = is_scalar($value) ? (string) $value : '';
+            $value = preg_replace('/[\x00-\x1F\x7F]+/', ' ', $value) ?? '';
+            $value = mb_check_encoding($value, 'UTF-8') ? trim($value) : '';
+
+            switch ($def['type']) {
+                case 'checkbox':
+                    // Browsers submit "on" for a checked box without a value attribute.
+                    $value = ($value !== '' && $value !== '0' && strtolower($value) !== 'off') ? 'on' : '';
+                    break;
+
+                case 'select':
+                    if (!in_array($value, $def['options'], true) && !in_array(rawurldecode($value), $def['options'], true)) {
+                        $value = $def['default'] ?? ($def['options'][0] ?? '');
+                    }
+                    break;
+
+                default:
+                    if ($def['lookup'] === '') {
+                        // Free text. Besides the strictly sanitised "$name", two extra variables:
+                        //  - "$name_b64": the exact text (any character) as base64url. Its alphabet has no quotes,
+                        //    spaces, "$" or "\", so it can travel inside key='value' filter strings safely.
+                        //    The parser decodes it (NEEDLE_B64) and still applies preg_quote().
+                        //  - "$name_show": for DISPLAY only; keeps quotes and symbols, drops "$", "@", "<", ">".
+                        $text = mb_substr($value, 0, 100, 'UTF-8');
+
+                        $clean[$name . '_b64']  = rtrim(strtr(base64_encode($text), '+/', '-_'), '=');
+                        $clean[$name . '_show'] = self::defuseArithmetic(trim(preg_replace('/[$@<>]+/u', '', $text) ?? ''));
+                    }
+
+                    $value = self::sanitizeTextVar($def['lookup'], $value);
+                    break;
+            }
+
+            $clean[$name] = $value;
+        }
+
+        return $clean;
+    }
+
+    private static function sanitizeTextVar(string $lookup, string $value): string
+    {
+        switch ($lookup) {
+            case 'INDI':
+            case 'FAM':
+            case 'SOUR':
+            case 'REPO':
+            case 'NOTE':
+            case 'OBJE':
+            case 'SUBM':
+                // GEDCOM xref: letters, digits and a few separators only.
+                return preg_match('/^[A-Za-z0-9_.:-]{0,30}$/', $value) === 1 ? $value : '';
+
+            case 'DATE':
+                // GEDCOM date text, e.g. "BET 1900 AND 1910", "15 JAN 2020", "1900/01".
+                return mb_substr(preg_replace('/[^\p{L}\p{N} .\/-]+/u', '', $value) ?? '', 0, 40);
+
+            default:
+                // Free text (e.g. filter_rt). It is later embedded in a key='value' filter string
+                // and a regular expression: remove quotes, "$", "\" and "@" and cap the length.
+                return self::defuseArithmetic(mb_substr(trim(preg_replace('/[\'"`$\\\\@]+/u', '', $value) ?? ''), 0, 100));
+        }
+    }
+
+    /** Only HTML or PDF are valid report formats. */
+    /** @param mixed $format */
+    public static function normalizeFormat($format): string
+    {
+        return $format === 'PDF' ? 'PDF' : 'HTML';
+    }
+
+    /** Only "view" or "download" are valid destinations. */
+    /** @param mixed $destination */
+    public static function normalizeDestination($destination): string
+    {
+        return $destination === 'download' ? 'download' : 'view';
+    }
+
+    /** Safe file name (no quotes, CR/LF or path separators) for Content-Disposition. */
+    public static function safeDownloadName(string $report): string
+    {
+        $name = trim(preg_replace('/[^A-Za-z0-9._-]+/', '_', $report) ?? '', '._');
+
+        return $name === '' ? 'report' : $name;
+    }
+
+    /**
+     * The report engine passes any variable value that looks like "1+1" to Symfony's ExpressionLanguage
+     * (where e.g. "1+1..99999999" builds a huge array). Insert an invisible WORD JOINER (U+2060) before the
+     * operator so user text is never mistaken for an arithmetic expression; the text looks the same.
+     */
+    private static function defuseArithmetic(string $text): string
+    {
+        return preg_replace('/(?<=\d)(\s*)([-+*\/])(?=\s*\d)/u', '$1' . "\u{2060}" . '$2', $text) ?? '';
+    }
+}

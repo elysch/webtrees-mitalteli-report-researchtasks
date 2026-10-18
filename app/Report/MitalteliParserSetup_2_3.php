@@ -85,7 +85,7 @@ class MitalteliParserSetup_2_3 extends AbstractParser
     {
         $reflection = new ReflectionClass(ParserSetup::class);
         $method     = $reflection->getMethod($method);
-        $method->setAccessible(true);
+        if (PHP_VERSION_ID < 80100) { $method->setAccessible(true); }
 
         return $method->invoke($this->delegate);
     }

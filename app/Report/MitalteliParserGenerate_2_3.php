@@ -372,7 +372,7 @@ class MitalteliParserGenerate_2_3 extends AbstractParser
     {
         $reflection = new ReflectionClass(ParserGenerate::class);
         $method     = $reflection->getMethod($method);
-        $method->setAccessible(true);
+        if (PHP_VERSION_ID < 80100) { $method->setAccessible(true); }
 
         return $method->invoke($this->delegate);
     }
@@ -428,7 +428,7 @@ class MitalteliParserGenerate_2_3 extends AbstractParser
     private function callOnDelegatePrivateMethodWithReflection(string $method_name, array $args = []): mixed
     {
         $reflection = new ReflectionMethod($this->delegate, $method_name);
-        $reflection->setAccessible(true);
+        if (PHP_VERSION_ID < 80100) { $reflection->setAccessible(true); }
 
         return $reflection->invoke($this->delegate, ...$args);
     }
@@ -482,11 +482,11 @@ class MitalteliParserGenerate_2_3 extends AbstractParser
         $current_element = $this->getFromDelegatePrivatePropertyWithReflection('current_element');
 
         if ($current_element->getValue() !== '') {
-            $text = '<a href="' . $this->tag_url . '">' . $current_element->getValue() . '</a>';
+            $text = '<a href="' . htmlspecialchars($this->tag_url, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '">' . $current_element->getValue() . '</a>';
 
             $element_reflection = new ReflectionObject($current_element);
             $text_property      = $element_reflection->getProperty('text');
-            $text_property->setAccessible(true);
+            if (PHP_VERSION_ID < 80100) { $text_property->setAccessible(true); }
             $text_property->setValue($current_element, '');
             $current_element->addText($text);
         }
@@ -509,7 +509,7 @@ class MitalteliParserGenerate_2_3 extends AbstractParser
     {
         $reflection = new ReflectionObject($this->delegate);
         $property   = $reflection->getProperty('list_total');
-        $property->setAccessible(true);
+        if (PHP_VERSION_ID < 80100) { $property->setAccessible(true); }
         $property->setValue($this->delegate, 0);
 
         $this->repeats_rec_filtered_out = 0;
@@ -524,7 +524,7 @@ class MitalteliParserGenerate_2_3 extends AbstractParser
     {
         $reflection = new ReflectionObject($this->delegate);
         $property   = $reflection->getProperty($property_name);
-        $property->setAccessible(true);
+        if (PHP_VERSION_ID < 80100) { $property->setAccessible(true); }
 
         return $property->getValue($this->delegate);
     }
@@ -590,6 +590,19 @@ class MitalteliParserGenerate_2_3 extends AbstractParser
     {
         $args = $this->parseKeyValueString($val);
 
+        // NEEDLE_B64: the needle may arrive base64url-encoded so it can contain ANY character
+        // (quotes, symbols...) without being able to break out of the key='value' filter string.
+        if (array_key_exists('NEEDLE_B64', $args)) {
+            $decoded = $args['NEEDLE_B64'] === null ? '' : base64_decode(strtr($args['NEEDLE_B64'], '-_', '+/'), true);
+
+            if ($decoded === false || !mb_check_encoding($decoded, 'UTF-8')) {
+                throw new DomainException('CONTAINS_R: NEEDLE_B64 is not valid base64url UTF-8 text');
+            }
+
+            $args['NEEDLE'] = $decoded === '' ? null : $decoded;
+            unset($args['NEEDLE_B64']);
+        }
+
         if (!array_key_exists('NEEDLE', $args)) {
             throw new DomainException('CONTAINS_R requires a NEEDLE argument');
         }
@@ -615,7 +628,7 @@ class MitalteliParserGenerate_2_3 extends AbstractParser
             $searchDontwant = '(?:(?:\n(?:' . $args['HAYSTACK_DONT_WANT_R'] . ') ?.*)*)';
         }
 
-        for ($i = 0; $i < (int) $args['REPEAT_W_DW_R']; $i++) {
+        for ($i = 0; $i < max(1, min(5, (int) $args['REPEAT_W_DW_R'])); $i++) {
             $searchstr .= $searchWant . $searchDontwant;
         }
 
@@ -679,7 +692,7 @@ class MitalteliParserGenerate_2_3 extends AbstractParser
 
         $reflection        = new ReflectionObject($this->delegate);
         $repeats_property  = $reflection->getProperty('repeats');
-        $repeats_property->setAccessible(true);
+        if (PHP_VERSION_ID < 80100) { $repeats_property->setAccessible(true); }
         $repeats           = $repeats_property->getValue($this->delegate);
 
         $kept = [];
@@ -749,9 +762,7 @@ class MitalteliParserGenerate_2_3 extends AbstractParser
         $filters2 = [];
         $this->prepareFactFilters($attrs, $filters, $filters2);
 
-        if ($filters === [] && $filters2 === []) {
-            return;
-        }
+        $has_filters = $filters !== [] || $filters2 !== [];
 
         $list = $this->getFromDelegatePrivatePropertyWithReflection('list');
         $kept = [];
@@ -762,12 +773,21 @@ class MitalteliParserGenerate_2_3 extends AbstractParser
                 continue;
             }
 
-            [$gedcom, $remaining] = $this->filterLevelOneFacts($record->gedcom(), $tag, $filters, $filters2);
+            if ($has_filters) {
+                [$gedcom, $remaining] = $this->filterLevelOneFacts($record->gedcom(), $tag, $filters, $filters2);
 
-            if ($remaining === 0) {
-                $this->repeats_rec_filtered_out++;
-                continue;
+                if ($remaining === 0) {
+                    $this->repeats_rec_filtered_out++;
+                    continue;
+                }
+            } else {
+                $gedcom = $record->gedcom();
             }
+
+            // FIX (saltos de renglon): webtrees >= 2.3 collapses "\n" into a space in
+            // Element::addText(); only a literal "<br>" survives as a line break.
+            // Done AFTER filtering so CONTAINS_R still matches against the real text.
+            $gedcom = $this->preserveLineBreaksInFacts($gedcom, $tag, $record->tree());
 
             if ($record instanceof Individual) {
                 $kept[] = Registry::individualFactory()->new($record->xref(), $gedcom, null, $record->tree());
@@ -779,8 +799,67 @@ class MitalteliParserGenerate_2_3 extends AbstractParser
         }
 
         $property = (new ReflectionObject($this->delegate))->getProperty('list');
-        $property->setAccessible(true);
+        if (PHP_VERSION_ID < 80100) { $property->setAccessible(true); }
         $property->setValue($this->delegate, $kept);
+    }
+
+    /**
+     * Make the line breaks of the level-1 facts "1 $tag" (research task text and its
+     * notes) survive webtrees >= 2.3's report engine.
+     *
+     * Why: GedcomTextReader::getGedcomValue() joins "n CONT" lines with "\n", but
+     * Element::addText() (final Cell -> cannot be subclassed) turns every "\n" into
+     * a space; only the literal string "<br>" (what <br/> inserts) becomes a real
+     * line break. We cannot hook core's GedcomValue handler (the <List> replay uses
+     * core's own, unmodifiable handler table), so the CONT lines are rewritten
+     * "n CONT text" -> "n CONT <br>text". The marker is plain text: HtmlWriter
+     * escapes it and the PDF writer only sees the resulting "\n" (no markup is
+     * ever interpreted, so no XSS/injection surface is added).
+     *
+     * Shared notes ("n NOTE @N1@") are inlined first, but ONLY when the current
+     * user may see them (same canShow() check core applies); otherwise the pointer
+     * is left untouched and core's behaviour (hide/skip) is unchanged.
+     */
+    private function preserveLineBreaksInFacts(string $gedcom, string $tag, Tree $tree): string
+    {
+        $blocks  = preg_split('/\n(?=1 )/', $gedcom) ?: [$gedcom];
+        $is_tag  = '/^1 ' . preg_quote($tag, '/') . '(?: |$)/';
+
+        foreach ($blocks as $index => $block) {
+            if ($index === 0 || preg_match($is_tag, $block) !== 1) {
+                continue;
+            }
+
+            $out = [];
+
+            foreach (explode("\n", $block) as $line_index => $line) {
+                // Inline a visible shared note: "2 NOTE @N1@" -> "2 NOTE first" + "3 CONT <br>next"...
+                if ($line_index > 0 && preg_match('/^(\d) NOTE @(' . Gedcom::REGEX_XREF . ')@$/', $line, $m) === 1) {
+                    $note = Registry::noteFactory()->make($m[2], $tree);
+
+                    if ($note !== null && $note->canShow()) {
+                        $note_lines = explode("\n", $note->getNote());
+                        $out[]      = $m[1] . ' NOTE ' . array_shift($note_lines);
+
+                        foreach ($note_lines as $note_line) {
+                            $out[] = ((int) $m[1] + 1) . ' CONT <br>' . $note_line;
+                        }
+
+                        continue;
+                    }
+                }
+
+                if ($line_index > 0 && preg_match('/^(\d) CONT(?: (.*))?$/', $line, $m) === 1) {
+                    $line = $m[1] . ' CONT <br>' . ($m[2] ?? '');
+                }
+
+                $out[] = $line;
+            }
+
+            $blocks[$index] = implode("\n", $out);
+        }
+
+        return implode("\n", $blocks);
     }
 
     /**
@@ -862,7 +941,7 @@ class MitalteliParserGenerate_2_3 extends AbstractParser
                     } elseif (preg_match("/\\d $id (.+)/", $gedrec, $match)) {
                         $value = "'" . str_replace('@', '', trim($match[1])) . "'";
                     }
-                    $condition = preg_replace("/@$id/", $value, $condition);
+                    $condition = preg_replace_callback("/@$id/", static function () use ($value) { return $value; }, $condition);
                 }
 
                 if (preg_match('/(?P<tag>' . Gedcom::REGEX_TAG . '(' . ':' . Gedcom::REGEX_TAG . ')*' . ')\s*(?P<expr>[^\s$]+)\s*(?P<val>.+)/', $condition, $match)) {
@@ -871,9 +950,10 @@ class MitalteliParserGenerate_2_3 extends AbstractParser
                     $val  = trim($match['val']);
 
                     $variables = $this->getFromDelegatePrivatePropertyWithReflection('variables');
-                    while (preg_match('/\\$(\w+)/', $val, $match)) {
+                    $substGuard = 0;
+                    while ($substGuard++ < 20 && preg_match('/\\$(\w+)/', $val, $match)) {
                         $regex = '/[$]' . $match[1] . '\b/u';
-                        $val   = preg_replace($regex, trim($variables->get($match[1])), $val);
+                        $val   = preg_replace_callback($regex, static function () use ($variables, $match) { return trim((string) $variables->get($match[1])); }, $val);
                     }
 
                     if ($val !== '') {
@@ -1047,20 +1127,13 @@ class MitalteliParserGenerate_2_3 extends AbstractParser
                     $needlestr = $this->removeDiacritics($needlestr);
                 }
 
-                $needlestr = preg_quote($needlestr, '/');
+                //-- Prepare the search. Remove new lines from haystack
+                $haystack = preg_replace('/\n/', ' ', $haystack) ?? $haystack;
 
-                if ($needle_ww) {
-                    $needlestr = '\b' . $needlestr . '\b';
-                }
-
-                if ($needle_ic) {
-                    $needlestr = '(?i)' . $needlestr;
-                }
-
-                $needlestr = str_replace(' ', '\s*', $needlestr);
-                $haystack  = preg_replace('/\n/', ' ', $haystack);
-
-                if (!preg_match('/' . $needlestr . '/', $haystack)) {
+                //-- Check if the needle exists in the haystack.
+                //   "Match whole string" OFF: every word, any order, any amount of spaces.
+                //   "Match whole string" ON : the text exactly as typed (same order and spaces).
+                if (!MitalteliNeedleMatcher::matches($haystack, (string) $needlestr, (bool) $needle_ww, (bool) $needle_ic)) {
                     $keep = false;
                 }
             }

@@ -217,7 +217,7 @@
                 </if>
 
                 <!-- THERE CAN BE MORE THAN ONE _TODO ENTRY -->
-                <RepeatTag tag="_TODO" filter5="$hideEmptyDatesFilter" filter4="_TODO CONTAINS_R NEEDLE='$filter_rt' NEEDLE_OP_WHOLE_WORD='$filter_rt_whole_word' NEEDLE_OP_IGNORE_CASE='$filter_rt_ignore_case' NEEDLE_OP_REMOVE_DIACRITICS='$filter_rt_remove_diacritics' HAYSTACK_WANT_R='2 CONT|2 NOTE|3 CONT' HAYSTACK_DONT_WANT_R='2 DATE|2 _WT_USER' REPEAT_W_DW_R=3 HAYSTACK_REPLACE_R='\1\2\3' HAYSTACK_REMOVE_WANT=1 HAYSTACK_INC_SHRD_NOTES_VAL=1" filter2="_TODO:DATE GTE $date1" filter3="_TODO:DATE LTE $date2">
+                <RepeatTag tag="_TODO" filter5="$hideEmptyDatesFilter" filter4="_TODO CONTAINS_R NEEDLE_B64='$filter_rt_b64' NEEDLE_OP_WHOLE_WORD='$filter_rt_whole_word' NEEDLE_OP_IGNORE_CASE='$filter_rt_ignore_case' NEEDLE_OP_REMOVE_DIACRITICS='$filter_rt_remove_diacritics' HAYSTACK_WANT_R='2 CONT|2 NOTE|3 CONT' HAYSTACK_DONT_WANT_R='2 DATE|2 _WT_USER' REPEAT_W_DW_R=3 HAYSTACK_REPLACE_R='\1\2\3' HAYSTACK_REMOVE_WANT=1 HAYSTACK_INC_SHRD_NOTES_VAL=1" filter2="_TODO:DATE GTE $date1" filter3="_TODO:DATE LTE $date2">
 
                     <!-- XREF -->
                     <if condition="$showXref=='on'">
@@ -332,7 +332,7 @@
                 <GetPersonName id="" setvar="Name"/>
 
                 <!-- THERE CAN BE MORE THAN ONE _TODO ENTRY -->
-                <RepeatTag tag="_TODO" filter5="$hideEmptyDatesFilter" filter4="_TODO CONTAINS_R NEEDLE='$filter_rt' NEEDLE_OP_WHOLE_WORD='$filter_rt_whole_word' NEEDLE_OP_IGNORE_CASE='$filter_rt_ignore_case' NEEDLE_OP_REMOVE_DIACRITICS='$filter_rt_remove_diacritics' HAYSTACK_WANT_R='2 CONT|2 NOTE|3 CONT' HAYSTACK_DONT_WANT_R='2 DATE|2 _WT_USER' REPEAT_W_DW_R=3 HAYSTACK_REPLACE_R='\1\2\3' HAYSTACK_REMOVE_WANT=1 HAYSTACK_INC_SHRD_NOTES_VAL=1" filter2="_TODO:DATE GTE $date1" filter3="_TODO:DATE LTE $date2">
+                <RepeatTag tag="_TODO" filter5="$hideEmptyDatesFilter" filter4="_TODO CONTAINS_R NEEDLE_B64='$filter_rt_b64' NEEDLE_OP_WHOLE_WORD='$filter_rt_whole_word' NEEDLE_OP_IGNORE_CASE='$filter_rt_ignore_case' NEEDLE_OP_REMOVE_DIACRITICS='$filter_rt_remove_diacritics' HAYSTACK_WANT_R='2 CONT|2 NOTE|3 CONT' HAYSTACK_DONT_WANT_R='2 DATE|2 _WT_USER' REPEAT_W_DW_R=3 HAYSTACK_REPLACE_R='\1\2\3' HAYSTACK_REMOVE_WANT=1 HAYSTACK_INC_SHRD_NOTES_VAL=1" filter2="_TODO:DATE GTE $date1" filter3="_TODO:DATE LTE $date2">
 
                     <!-- XREF -->
                     <if condition="$showXref=='on'">
@@ -425,7 +425,7 @@
             
                     <var var="I18N::translate('Research task creation date range start')" />: [<var var="$date1"/>]                              <br />
                     <var var="I18N::translate('Research task creation date range end')" />: [<var var="$date2"/>]                                <br />
-                    <var var="I18N::translate('Research Task Filter')" />: [<var var="$filter_rt"/>]                                             <br />
+                    <var var="I18N::translate('Research Task Filter')" />: [<var var="$filter_rt_show"/>]                                             <br />
                     <var var="I18N::translate('Sort order')" />: [<var var="$sortby"/>]                                                          <br /><br />
                     <if condition="$sortby=='_TODO:DATE' or $sortby=='_TODO' or $sortby=='_TODO:NOTE' or $sortby=='_TODO:_WT_USER'">
                         <var var="I18N::translate('About sort: It takes the first fact of each individual or family to sort, ignores the rest and sends empty values to the end.')" /> <br />
