@@ -49,7 +49,11 @@
     'Select an individual below. To show all individuals instead, check this option.' => 'Wählen Sie unten eine Person aus. Um stattdessen alle Personen anzuzeigen, aktivieren Sie diese Option.', // app/ResearchTasksReportModule.php
     'To select a specific family, uncheck this option.' => 'Um eine bestimmte Familie auszuwählen, deaktivieren Sie diese Option.', // app/ResearchTasksReportModule.php
     'Select a family below. To show all families instead, check this option.' => 'Wählen Sie unten eine Familie aus. Um stattdessen alle Familien anzuzeigen, aktivieren Sie diese Option.', // app/ResearchTasksReportModule.php
-
     'Open the report in a new tab' => 'Bericht in einem neuen Tab öffnen', // app/ResearchTasksReportModule.php
-    ];
+    'Default values' => 'Standardwerte', // app/ResearchTasksReportModule.php
+    'Values used when the report parameters page is opened from the menu or from a link. The choices a visitor makes (reload, back button, new tab option) take precedence.' => 'Werte, die verwendet werden, wenn die Parameterseite des Berichts über das Menü oder über einen Link geöffnet wird. Die Auswahl des Besuchers (Neuladen, Zurück-Schaltfläche, Option „Neuer Tab“) hat Vorrang.', // resources/views/admin.phtml
+    'The individual, the family and the dates are not included: they depend on each visit.' => 'Die Person, die Familie und die Datumsangaben sind nicht enthalten: Sie hängen von jedem Besuch ab.', // resources/views/admin.phtml
+    'Restore the original values' => 'Ursprüngliche Werte wiederherstellen', // resources/views/admin.phtml
+    'Configure the default values' => 'Standardwerte konfigurieren', // app/ResearchTasksReportModule.php
+];
 ?>

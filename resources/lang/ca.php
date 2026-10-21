@@ -50,7 +50,11 @@
     'Select an individual below. To show all individuals instead, check this option.' => 'Seleccioneu una persona a continuació. Per mostrar totes les persones en lloc d’això, marqueu aquesta opció.', // app/ResearchTasksReportModule.php
     'To select a specific family, uncheck this option.' => 'Per seleccionar una família concreta, desmarqueu aquesta opció.', // app/ResearchTasksReportModule.php
     'Select a family below. To show all families instead, check this option.' => 'Seleccioneu una família a continuació. Per mostrar totes les famílies en lloc d’això, marqueu aquesta opció.', // app/ResearchTasksReportModule.php
-
     'Open the report in a new tab' => 'Obre l’informe en una pestanya nova', // app/ResearchTasksReportModule.php
-    ];
+    'Default values' => 'Valors per defecte', // app/ResearchTasksReportModule.php
+    'Values used when the report parameters page is opened from the menu or from a link. The choices a visitor makes (reload, back button, new tab option) take precedence.' => 'Valors utilitzats quan la pàgina de paràmetres de l’informe s’obre des del menú o des d’un enllaç. Les opcions que tria el visitant (recàrrega, botó enrere, opció de pestanya nova) tenen prioritat.', // resources/views/admin.phtml
+    'The individual, the family and the dates are not included: they depend on each visit.' => 'L’individu, la família i les dates no s’inclouen: depenen de cada visita.', // resources/views/admin.phtml
+    'Restore the original values' => 'Restaura els valors originals', // resources/views/admin.phtml
+    'Configure the default values' => 'Configura els valors per defecte', // app/ResearchTasksReportModule.php
+];
 ?>

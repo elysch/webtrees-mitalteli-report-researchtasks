@@ -20,25 +20,35 @@ use Fisharebest\Webtrees\Http\RequestHandlers\ReportGenerate;
 use Fisharebest\Webtrees\Http\Controllers\ReportGenerate as CoreReportGenerateController_2_3;
 use Fisharebest\Webtrees\Http\Controllers\ReportSetup as CoreReportSetupController_2_3;
 
+use Fisharebest\Webtrees\Auth;
+use Fisharebest\Webtrees\FlashMessages;
+use Fisharebest\Webtrees\Http\Exceptions\HttpAccessDeniedException;
 use Fisharebest\Webtrees\I18N;
 use Fisharebest\Webtrees\Module\AbstractModule;
+use Fisharebest\Webtrees\Module\ModuleConfigInterface;
+use Fisharebest\Webtrees\Module\ModuleConfigTrait;
 use Fisharebest\Webtrees\Module\ModuleCustomInterface;
 use Fisharebest\Webtrees\Module\ModuleCustomTrait;
 use Fisharebest\Webtrees\Module\ModuleReportInterface;
 use Fisharebest\Webtrees\Module\ModuleReportTrait;
 use Fisharebest\Webtrees\Module\ModuleGlobalInterface;
+use Fisharebest\Webtrees\View;
 use Fisharebest\Webtrees\Webtrees;
+use Psr\Http\Message\ResponseInterface;
+use Psr\Http\Message\ServerRequestInterface;
+use Throwable;
 use Fisharebest\Webtrees\Services\ModuleService;
 use Fisharebest\Localization\Translation;
 
 
-class ResearchTasksReportModule extends AbstractModule implements ModuleCustomInterface, ModuleReportInterface, ModuleGlobalInterface {
+class ResearchTasksReportModule extends AbstractModule implements ModuleCustomInterface, ModuleReportInterface, ModuleGlobalInterface, ModuleConfigInterface {
+    use ModuleConfigTrait;
     use ModuleCustomTrait;
     use ModuleReportTrait;
     public ModuleService $module_service;
 
     public const CUSTOM_AUTHOR = 'elysch';
-    public const CUSTOM_VERSION = '3.4.2';
+    public const CUSTOM_VERSION = '3.4.3';
     public const GITHUB_REPO = 'webtrees-mitalteli-report-researchtasks';
     public const AUTHOR_WEBSITE = 'https://github.com/elysch/webtrees-mitalteli-report-researchtasks/';
     public const CUSTOM_SUPPORT_URL = self::AUTHOR_WEBSITE . 'issues';
@@ -57,6 +67,9 @@ class ResearchTasksReportModule extends AbstractModule implements ModuleCustomIn
 
     public function boot(): void
     {
+        // Views of the administration page (default values).
+        View::registerNamespace($this->name(), $this->resourcesFolder() . 'views/');
+
         if (version_compare(Webtrees::VERSION, '2.3.0-dev', '>=')) {
             // The report PARAMETERS page (before generating the report) uses a
             // different controller/parser than generation -- both have to be
@@ -100,6 +113,87 @@ class ResearchTasksReportModule extends AbstractModule implements ModuleCustomIn
     /**
      * @return string
      */
+    /**
+     * Administration page: default values for a fresh opening of the report parameters page.
+     * Only administrators (the "Admin" action name is also protected by the webtrees router).
+     *
+     * @param ServerRequestInterface|null $request Not used (the signature differs between webtrees versions)
+     */
+    public function getAdminAction(?ServerRequestInterface $request = null): ResponseInterface
+    {
+        if (!Auth::isAdmin()) {
+            throw new HttpAccessDeniedException();
+        }
+
+        $this->layout = 'layouts/administration';
+
+        return $this->viewResponse($this->name() . '::admin', [
+            'title'      => I18N::translate(self::REPORT_TITLE) . ' — ' . I18N::translate('Default values'),
+            'action_url' => $this->getConfigLink(),
+            'control_panel_url' => $this->controlPanelUrl(),
+            'fields'     => MitalteliReportDefaults::fields(),
+            'values'     => MitalteliReportDefaults::forForm($this->getPreference(MitalteliReportDefaults::PREFERENCE)),
+        ]);
+    }
+
+    /**
+     * URL of the webtrees control panel for the breadcrumb ("" when it cannot be resolved).
+     * The route name differs between webtrees versions: every known name is tried, then the address is derived.
+     */
+    private function controlPanelUrl(): string
+    {
+        foreach ([\Fisharebest\Webtrees\Http\RequestHandlers\ControlPanel::class, 'admin-control-panel'] as $route_name) {
+            try {
+                return \route($route_name);
+            } catch (Throwable $exception) {
+                // Try the next name.
+            }
+        }
+
+        // Route names changed again in webtrees 2.3: build the URL from this page's own address,
+        // replacing ".../module/<name>/Admin" by ".../admin" (also valid with "index.php?route=" URLs).
+        $config_link = $this->getConfigLink();
+        $suffix      = '/module/' . $this->name() . '/Admin';
+        $position    = strrpos($config_link, $suffix);
+
+        if ($position !== false) {
+            return substr($config_link, 0, $position) . '/admin' . substr($config_link, $position + strlen($suffix));
+        }
+
+        return '';
+    }
+
+    /**
+     * Saves (or resets) the default values. CSRF is checked by the webtrees middleware for every POST.
+     */
+    public function postAdminAction(ServerRequestInterface $request): ResponseInterface
+    {
+        if (!Auth::isAdmin()) {
+            throw new HttpAccessDeniedException();
+        }
+
+        $params = (array) $request->getParsedBody();
+
+        if (isset($params['reset'])) {
+            $this->setPreference(MitalteliReportDefaults::PREFERENCE, '');
+        } else {
+            $values = MitalteliReportDefaults::normalize(is_array($params['d'] ?? null) ? $params['d'] : []);
+            $this->setPreference(MitalteliReportDefaults::PREFERENCE, MitalteliReportDefaults::encode($values));
+        }
+
+        FlashMessages::addMessage(I18N::translate('The preferences for the module “%s” have been updated.', $this->title()), 'success');
+
+        $url = $this->getConfigLink();
+
+        // A plain PSR-7 redirect: ResponseFactory::redirect() takes a route NAME in webtrees 2.1
+        // but a URL in 2.2+, so it is only used when the PSR-7 library is not available.
+        if (class_exists(\Nyholm\Psr7\Response::class)) {
+            return new \Nyholm\Psr7\Response(302, ['Location' => $url]);
+        }
+
+        return Registry::responseFactory()->redirect($url);
+    }
+
     public function title(): string
     {
         /* I18N: Name of a module/report */
@@ -209,21 +303,38 @@ class ResearchTasksReportModule extends AbstractModule implements ModuleCustomIn
             'famUnchecked'  => I18N::translate('Select a family below. To show all families instead, check this option.'),
             // Checkbox added next to the "view" / "download" buttons
             'newTab'        => I18N::translate('Open the report in a new tab'),
+            // Link to the administration page (shown to administrators only)
+            'configure'     => I18N::translate('Configure the default values'),
         ], JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT);
 
-        // webtrees < 2.2 does not keep the selected options when the user comes back to the
-        // parameters page (2.2+ does), so the form state is restored from sessionStorage there.
-        $restore = version_compare(Webtrees::VERSION, '2.2.0', '<') ? 'true' : 'false';
+        // The selected options are kept in sessionStorage and restored when the parameters page
+        // is reloaded or reached again through the browser history (all supported webtrees versions).
+        // Defaults chosen by the administrator for a fresh opening ({} when none were saved).
+        $defaults = json_encode(
+            (object) MitalteliReportDefaults::load((string) $this->getPreference(MitalteliReportDefaults::PREFERENCE)),
+            JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT
+        );
 
-        return "\n" . str_replace(['__MIT_MESSAGES__', '__MIT_RESTORE__'], [$messages, $restore], <<<'JS'
+        // Link to the administration page, only for administrators ("" for everybody else).
+        $admin_url = Auth::isAdmin() ? $this->getConfigLink() : '';
+        $admin_url = json_encode($admin_url, JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT);
+
+        return "\n" . strtr(<<<'JS'
             <script type="text/javascript">
             (function () {
                 // Translated help texts (injected by PHP).
                 var messages = __MIT_MESSAGES__;
 
-                // true on webtrees < 2.2 (see PHP side): restore the form when coming back.
-                var restoreForm = __MIT_RESTORE__;
-                var STATE_KEY   = 'mitalteli-researchtasks-form';
+                // Administrator's defaults for a fresh opening (see MitalteliReportDefaults).
+                var adminDefaults    = __MIT_DEFAULTS__;
+                var hasAdminDefaults = Object.keys(adminDefaults).length > 0;
+                // URL of the administration page; empty unless the visitor is an administrator.
+                var adminUrl         = __MIT_ADMIN_URL__;
+                // true when the first-load "preselected record" logic must not run (see init()).
+                var skipAutoSwitch   = false;
+
+                // One saved state per parameters page (path + query string = report, tree and xref).
+                var STATE_KEY   = 'mitalteli-researchtasks-form:' + window.location.pathname + window.location.search;
                 var NEWTAB_KEY  = 'mitalteli-researchtasks-newtab';
 
                 // [checkbox name, name of the control that the checkbox hides]
@@ -289,20 +400,22 @@ class ResearchTasksReportModule extends AbstractModule implements ModuleCustomIn
                     apply(other.checkbox, other.row);
                 }
 
-                // ---- Form state (webtrees < 2.2) ---------------------------------------------
+                // ---- Form state (kept across reloads and history navigation) -----------------
 
                 function getForm() {
                     var probe = document.getElementsByName(pairs[0][0])[0];
                     return probe ? probe.closest('form') : null;
                 }
 
-                function isBackNavigation() {
+                // True when the page is shown again (browser reload or back/forward). A fresh open
+                // (menu, link) is a plain "navigate" and keeps the defaults and the preselected record.
+                function isRestorableNavigation() {
                     try {
                         var nav = window.performance && performance.getEntriesByType
                             ? performance.getEntriesByType('navigation')[0] : null;
-                        if (nav) { return nav.type === 'back_forward'; }
-                        return window.performance && performance.navigation
-                            && performance.navigation.type === 2;
+                        if (nav) { return nav.type === 'back_forward' || nav.type === 'reload'; }
+                        return !!(window.performance && performance.navigation
+                            && (performance.navigation.type === 1 || performance.navigation.type === 2));
                     } catch (e) { return false; }
                 }
 
@@ -326,10 +439,47 @@ class ResearchTasksReportModule extends AbstractModule implements ModuleCustomIn
                     } catch (e) { /* storage unavailable: nothing is remembered */ }
                 }
 
+                // Tell the select widget (Tom Select in 2.2+, select2 in 2.0/2.1) about the restored
+                // value, in case it was already built. Silent: no change event is fired.
+                function refreshSelectWidget(el, saved) {
+                    try {
+                        if (el.tomselect) {
+                            if (saved.value !== '') { el.tomselect.addOption({ value: saved.value, text: saved.text }); }
+                            el.tomselect.setValue(saved.value, true);
+                        } else if (window.jQuery && window.jQuery(el).data('select2')) {
+                            window.jQuery(el).trigger('change.select2');
+                        }
+                    } catch (e) { /* the plain <select> value is already set */ }
+                }
+
+                // Set one control (by its name) from a default value: "1"/"0" for checkboxes.
+                function setField(name, value) {
+                    Array.prototype.forEach.call(document.getElementsByName(name), function (el) {
+                        if (el.type === 'checkbox') {
+                            el.checked = (value === '1');
+                        } else if (el.type === 'radio') {
+                            el.checked = (el.value === value);
+                        } else if (el.tagName === 'SELECT') {
+                            var known = Array.prototype.some.call(el.options, function (o) { return o.value === value; });
+                            if (known) { el.value = value; }
+                        } else {
+                            el.value = value;
+                        }
+                    });
+                }
+
+                function applyAdminDefaults() {
+                    Object.keys(adminDefaults).forEach(function (key) {
+                        if (key === 'newTab') { return; } // handled by addNewTabOption()
+                        setField(key === 'format' ? 'format' : 'vars[' + key + ']', adminDefaults[key]);
+                    });
+                }
+
+                // Returns true when a saved state was found and applied.
                 function restoreState(form) {
                     var state;
-                    try { state = JSON.parse(window.sessionStorage.getItem(STATE_KEY) || 'null'); } catch (e) { return; }
-                    if (!state) { return; }
+                    try { state = JSON.parse(window.sessionStorage.getItem(STATE_KEY) || 'null'); } catch (e) { return false; }
+                    if (!state) { return false; }
                     var checkboxes = [];
                     Array.prototype.forEach.call(form.elements, function (el) {
                         var saved = state[el.name];
@@ -345,12 +495,14 @@ class ResearchTasksReportModule extends AbstractModule implements ModuleCustomIn
                                 el.add(new Option(saved.text, saved.value, true, true));
                             }
                             el.value = saved.value;
+                            refreshSelectWidget(el, saved);
                         } else {
                             el.value = saved.value;
                         }
                     });
                     // Checkboxes last: init() then hides/shows the matching selector rows from them.
                     checkboxes.forEach(function (c) { c[0].checked = c[1]; });
+                    return true;
                 }
 
                 // ---- "Open the report in a new tab" ------------------------------------------
@@ -368,7 +520,12 @@ class ResearchTasksReportModule extends AbstractModule implements ModuleCustomIn
                     box.type = 'checkbox';
                     box.className = 'form-check-input';
                     box.id = 'mit-new-tab';
-                    try { box.checked = window.localStorage.getItem(NEWTAB_KEY) === '1'; } catch (e) {}
+                    // The visitor's own choice wins; otherwise the administrator's default.
+                    box.checked = (adminDefaults.newTab === '1');
+                    try {
+                        var storedNewTab = window.localStorage.getItem(NEWTAB_KEY);
+                        if (storedNewTab !== null) { box.checked = (storedNewTab === '1'); }
+                    } catch (e) {}
                     var label = document.createElement('label');
                     label.className = 'form-check-label';
                     label.htmlFor = 'mit-new-tab';
@@ -376,6 +533,17 @@ class ResearchTasksReportModule extends AbstractModule implements ModuleCustomIn
                     wrap.appendChild(box);
                     wrap.appendChild(label);
                     buttons.parentElement.insertBefore(wrap, buttons.parentElement.firstChild);
+
+                    // Shortcut for administrators to the default values page.
+                    if (adminUrl) {
+                        var adminWrap = document.createElement('div');
+                        adminWrap.className = 'mb-2 small';
+                        var adminLink = document.createElement('a');
+                        adminLink.href = adminUrl;
+                        adminLink.textContent = messages.configure;
+                        adminWrap.appendChild(adminLink);
+                        buttons.parentElement.insertBefore(adminWrap, wrap.nextSibling);
+                    }
 
                     box.addEventListener('change', function () {
                         try { window.localStorage.setItem(NEWTAB_KEY, box.checked ? '1' : '0'); } catch (e) {}
@@ -400,11 +568,22 @@ class ResearchTasksReportModule extends AbstractModule implements ModuleCustomIn
 
                     addNewTabOption(form);
 
-                    if (restoreForm) {
-                        form.addEventListener('submit', function () { saveState(form); });
-                        // Only when coming back (history): a fresh open from the menu keeps the defaults
-                        // and the preselected individual.
-                        if (isBackNavigation()) { restoreState(form); }
+                    // Saved when the form is sent and whenever the page is left (reload included), so
+                    // options changed but not yet submitted survive a reload too.
+                    form.addEventListener('submit', function () { saveState(form); });
+                    window.addEventListener('pagehide', function () { saveState(form); });
+                    var restored = isRestorableNavigation() && restoreState(form);
+                    if (restored) {
+                        // Keep exactly what the visitor had: no automatic show-all switching.
+                        skipAutoSwitch = true;
+                    } else if (hasAdminDefaults) {
+                        applyAdminDefaults();
+                        // An explicit ?xref=... keeps the "show the requested record" behaviour;
+                        // otherwise the administrator's show-all choices are not overridden.
+                        if (!/[?&]xref=/.test(window.location.search)
+                            && ('showAllIndividuals' in adminDefaults || 'showAllFamilies' in adminDefaults)) {
+                            skipAutoSwitch = true;
+                        }
                     }
                 }
 
@@ -438,7 +617,7 @@ class ResearchTasksReportModule extends AbstractModule implements ModuleCustomIn
                     // First load only: a prefilled selector (the report opened from an
                     // individual/family page via ?xref=...) must not stay hidden behind the
                     // "show all" default. Not on pageshow, to keep the user's own state.
-                    if (!event || event.type !== 'pageshow') {
+                    if ((!event || event.type !== 'pageshow') && !skipAutoSwitch) {
                         var indi = getItem(indiPair), fam = getItem(famPair);
                         if (indi && fam) {
                             var indiSet = indi.control.value !== '', famSet = fam.control.value !== '';
@@ -453,7 +632,8 @@ class ResearchTasksReportModule extends AbstractModule implements ModuleCustomIn
                 window.addEventListener('pageshow', init);
             })();
             </script>
-JS
+JS,
+            ['__MIT_MESSAGES__' => $messages, '__MIT_DEFAULTS__' => $defaults, '__MIT_ADMIN_URL__' => $admin_url]
         ) . "\n";
     }
 

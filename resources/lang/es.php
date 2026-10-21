@@ -45,11 +45,15 @@
     'Total families' => 'Total de familias', // mitalteli-report-researchtasks/resources/report.xml
     'Report Parameters' => 'Parámetros del reporte', // mitalteli-report-researchtasks/resources/report.xml
     'About sort: It takes the first fact of each individual or family to sort, ignores the rest and sends empty values to the end.' => 'Acerca del orden: Toma el primer hecho de cada individuo o familia para ordenar, ignora el resto y coloca los valores vacíos al final.', // mitalteli-report-researchtasks/resources/report.xml
-
     'To select a specific individual, uncheck this option.' => 'Para seleccionar un individuo específico, desmarque esta opción.', // app/ResearchTasksReportModule.php
     'Select an individual below. To show all individuals instead, check this option.' => 'Seleccione un individuo abajo. Para mostrar todos los individuos, marque esta opción.', // app/ResearchTasksReportModule.php
     'To select a specific family, uncheck this option.' => 'Para seleccionar una familia específica, desmarque esta opción.', // app/ResearchTasksReportModule.php
     'Select a family below. To show all families instead, check this option.' => 'Seleccione una familia abajo. Para mostrar todas las familias, marque esta opción.', // app/ResearchTasksReportModule.php
     'Open the report in a new tab' => 'Abrir el reporte en una pestaña nueva', // app/ResearchTasksReportModule.php
-    ];
+    'Default values' => 'Valores por defecto', // app/ResearchTasksReportModule.php
+    'Values used when the report parameters page is opened from the menu or from a link. The choices a visitor makes (reload, back button, new tab option) take precedence.' => 'Valores usados cuando la página de parámetros del reporte se abre desde el menú o desde un enlace. Las elecciones del visitante (recarga, botón atrás, opción de pestaña nueva) tienen prioridad.', // resources/views/admin.phtml
+    'The individual, the family and the dates are not included: they depend on each visit.' => 'El individuo, la familia y las fechas no se incluyen: dependen de cada visita.', // resources/views/admin.phtml
+    'Restore the original values' => 'Restaurar los valores originales', // resources/views/admin.phtml
+    'Configure the default values' => 'Configurar los valores por defecto', // app/ResearchTasksReportModule.php
+];
 ?>

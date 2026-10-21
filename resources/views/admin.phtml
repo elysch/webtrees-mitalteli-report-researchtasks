@@ -1,0 +1,57 @@
+<?php
+
+use Fisharebest\Webtrees\I18N;
+use vendor\WebtreesModules\mitalteli\ResearchTasksReportNamespace\MitalteliReportDefaults;
+
+/**
+ * @var string               $title
+ * @var string               $action_url
+ * @var string               $control_panel_url
+ * @var array<string,array>  $fields
+ * @var array<string,string> $values
+ */
+
+?>
+
+<?= view('components/breadcrumbs', ['links' => $control_panel_url === '' ? [] : [$control_panel_url => I18N::translate('Control panel')], 'current_page' => $title]) ?>
+
+<h1><?= e($title) ?></h1>
+
+<p class="text-muted">
+    <?= I18N::translate('Values used when the report parameters page is opened from the menu or from a link. The choices a visitor makes (reload, back button, new tab option) take precedence.') ?>
+    <?= I18N::translate('The individual, the family and the dates are not included: they depend on each visit.') ?>
+</p>
+
+<form method="post" action="<?= e($action_url) ?>">
+    <?= csrf_field() ?>
+
+    <?php foreach ($fields as $key => $field) : ?>
+        <?php $id = 'mit-default-' . $key; ?>
+        <div class="row mb-3">
+            <?php if ($field['type'] === 'checkbox') : ?>
+                <div class="col-sm-9 offset-sm-3">
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="<?= e($id) ?>" name="d[<?= e($key) ?>]" value="1" <?= ($values[$key] ?? '0') === '1' ? 'checked' : '' ?>>
+                        <label class="form-check-label" for="<?= e($id) ?>"><?= e(I18N::translate($field['label'])) ?></label>
+                    </div>
+                </div>
+            <?php else : ?>
+                <label class="col-sm-3 col-form-label" for="<?= e($id) ?>"><?= e(I18N::translate($field['label'])) ?></label>
+                <div class="col-sm-9">
+                    <?php if ($field['type'] === 'select') : ?>
+                        <select class="form-select" id="<?= e($id) ?>" name="d[<?= e($key) ?>]">
+                            <?php foreach (array_keys($field['options']) as $option) : ?>
+                                <option value="<?= e($option) ?>" <?= ($values[$key] ?? '') === $option ? 'selected' : '' ?>><?= e(MitalteliReportDefaults::optionLabel($key, $option)) ?></option>
+                            <?php endforeach ?>
+                        </select>
+                    <?php else : ?>
+                        <input class="form-control" type="text" id="<?= e($id) ?>" name="d[<?= e($key) ?>]" value="<?= e($values[$key] ?? '') ?>" maxlength="<?= (int) MitalteliReportDefaults::MAX_TEXT_CHARS ?>" autocomplete="off">
+                    <?php endif ?>
+                </div>
+            <?php endif ?>
+        </div>
+    <?php endforeach ?>
+
+    <button type="submit" class="btn btn-primary"><?= I18N::translate('save') ?></button>
+    <button type="submit" class="btn btn-secondary" name="reset" value="1"><?= I18N::translate('Restore the original values') ?></button>
+</form>
