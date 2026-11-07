@@ -79,28 +79,24 @@ class MitalteliHtmlRenderer extends HtmlRenderer
 
         // The word wrap counts the characters of <a href="..."> tags and may cut the URL (cut=true),
         // which breaks the link. Swap each opening tag for a short token while wrapping.
-        if (str_contains($this->title, ResearchTasksReportModule::REPORT_TITLE) && str_contains($str, '<a href="')) {
+        if (ResearchTasksReportModule::isReportTitle($this->title) && str_contains($str, '<a ')) {
             $tags      = [];
-            $protected = preg_replace_callback(
-                '~<a href="[^"]*">~',
-                static function (array $m) use (&$tags): string {
-                    $tags[] = $m[0];
+            // Protect the opening tag <a ...> and the closing tag </a>
+            $protected = preg_replace_callback('~<a\s[^>]*>|</a>~i', static function (array $m) use (&$tags): string {
+                $tags[] = $m[0];
+                return "\x01" . (count($tags) - 1) . "\x02";
+            }, $str);
+            if ($protected === null) {
+                return parent::textWrap($str, $width);
+            }
+            $wrapped = parent::textWrap($protected, $width);
+            // Si un salto partió un token, se une de nuevo
+            $wrapped = preg_replace_callback("~\x01([0-9\n]+)\x02~", static fn (array $m): string =>
+                "\x01" . str_replace("\n", '', $m[1]) . "\x02", $wrapped) ?? $wrapped;
 
-                    return "\x01" . (count($tags) - 1) . "\x02";
-                },
-                $str
-            );
-            $wrapped = parent::textWrap($protected ?? $str, $width);
-            // Undo a line break that fell inside a token, then restore the tags.
-            $wrapped = preg_replace_callback("~\x01([0-9\n]+)\x02~", static function (array $m): string {
-                return "\x01" . str_replace("\n", '', $m[1]) . "\x02";
-            }, $wrapped) ?? $wrapped;
-
-            return preg_replace_callback("~\x01([0-9]+)\x02~", static function (array $m) use ($tags): string {
-                return $tags[(int) $m[1]] ?? '';
-            }, $wrapped) ?? $wrapped;
+            return preg_replace_callback("~\x01([0-9]+)\x02~", static fn (array $m): string =>
+                $tags[(int) $m[1]] ?? '', $wrapped) ?? $wrapped;
         }
-
         return parent::textWrap($str, $width);
     }
 
@@ -134,7 +130,7 @@ class MitalteliHtmlRenderer extends HtmlRenderer
     {
         // Check if the report string contains the module directory path
         // if not running from this module, redirect to the standard ReportGenerate handler
-        if (!str_contains($this->title, ResearchTasksReportModule::REPORT_TITLE)) {
+        if (!ResearchTasksReportModule::isReportTitle($this->title)) {
             // Call the parent method
             parent::{__FUNCTION__}($text, $color, $useclass);
             return;

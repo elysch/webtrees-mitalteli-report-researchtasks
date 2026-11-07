@@ -48,7 +48,7 @@ class ResearchTasksReportModule extends AbstractModule implements ModuleCustomIn
     public ModuleService $module_service;
 
     public const CUSTOM_AUTHOR = 'elysch';
-    public const CUSTOM_VERSION = '3.4.3';
+    public const CUSTOM_VERSION = '3.4.4';
     public const GITHUB_REPO = 'webtrees-mitalteli-report-researchtasks';
     public const AUTHOR_WEBSITE = 'https://github.com/elysch/webtrees-mitalteli-report-researchtasks/';
     public const CUSTOM_SUPPORT_URL = self::AUTHOR_WEBSITE . 'issues';
@@ -92,6 +92,12 @@ class ResearchTasksReportModule extends AbstractModule implements ModuleCustomIn
             app()->instance(ReportGenerate::class, new MitalteliReportGenerate_2_0($this->module_service));
             app()->instance(ReportSetupPage::class, new MitalteliReportSetupPage_Legacy(self::getClass(ReportSetupPage::class)));
         }
+    }
+
+    public static function isReportTitle(string $title): bool
+    {
+        return str_contains($title, self::REPORT_TITLE)
+            || str_contains($title, I18N::translate(self::REPORT_TITLE));
     }
 
     /**

@@ -35,7 +35,7 @@ class MitalteliTcpdfWrapper extends TcpdfWrapper
     {
         // Check if the report string contains the module directory path
         // if not running from this module, redirect to the standard ReportGenerate handler
-        if (!str_contains($this->title, ResearchTasksReportModule::REPORT_TITLE)) {
+        if (!ResearchTasksReportModule::isReportTitle($this->title)) {
             return parent::{__FUNCTION__}(); // Call the parent method
         }
 
@@ -71,7 +71,7 @@ class MitalteliTcpdfWrapper extends TcpdfWrapper
     public function Footer() {
         // Check if the report string contains the module directory path
         // if not running from this module, redirect to the standard ReportGenerate handler
-        if (!str_contains($this->title, ResearchTasksReportModule::REPORT_TITLE)) {
+        if (!ResearchTasksReportModule::isReportTitle($this->title)) {
             parent::{__FUNCTION__}(); // Call the parent method and
             return;
         }

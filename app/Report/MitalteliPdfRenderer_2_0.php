@@ -63,7 +63,7 @@ class MitalteliPdfRenderer_2_0 extends PdfRenderer
     {
         // Check if the report string contains the module directory path
         // if not running from this module, redirect to the standard ReportGenerate handler
-        if (!str_contains($this->title, ResearchTasksReportModule::REPORT_TITLE)) {
+        if (!ResearchTasksReportModule::isReportTitle($this->title)) {
             parent::{__FUNCTION__}(); // Call the parent method and
             return;
         }
