@@ -48,13 +48,30 @@ class ResearchTasksReportModule extends AbstractModule implements ModuleCustomIn
     public ModuleService $module_service;
 
     public const CUSTOM_AUTHOR = 'elysch';
-    public const CUSTOM_VERSION = '3.4.4';
+    public const CUSTOM_VERSION = '3.4.5';
     public const GITHUB_REPO = 'webtrees-mitalteli-report-researchtasks';
     public const AUTHOR_WEBSITE = 'https://github.com/elysch/webtrees-mitalteli-report-researchtasks/';
     public const CUSTOM_SUPPORT_URL = self::AUTHOR_WEBSITE . 'issues';
 
-    /* The report title must be exactly the same as in resources/report.xml in two places at least*/
+    /** Sorts the module next to the author's other modules in the module list.
+     * The report title is the name of the module. Every place that translates it (title(), the report XML
+     * files, the parameters page, the report header...) gets the sorting prefix from here, in every language
+     * (also when the language has no translation of it and the English text is used). */
+    private const TITLE_PREFIX = "\u{26EE} "; # ⛮
+
+    /* The report title must be exactly the same as in resources/report.xml and resources/report-2.3.xml in two places each, at least*/
     public const REPORT_TITLE = 'Research tasks report';
+
+    /**
+     * Name of the module as shown to the user (TITLE_PREFIX + translated report title).
+     *
+     * The prefix is injected by customTranslations(), so this is the same text that the XML files get from
+     * I18N::translate('Research tasks report').
+     */
+    public static function displayTitle(): string
+    {
+        return I18N::translate(self::REPORT_TITLE);
+    }
     
     /**
      *
@@ -134,7 +151,7 @@ class ResearchTasksReportModule extends AbstractModule implements ModuleCustomIn
         $this->layout = 'layouts/administration';
 
         return $this->viewResponse($this->name() . '::admin', [
-            'title'      => I18N::translate(self::REPORT_TITLE) . ' — ' . I18N::translate('Default values'),
+            'title'      => self::displayTitle() . ' — ' . I18N::translate('Default values'),
             'action_url' => $this->getConfigLink(),
             'control_panel_url' => $this->controlPanelUrl(),
             'fields'     => MitalteliReportDefaults::fields(),
@@ -203,7 +220,7 @@ class ResearchTasksReportModule extends AbstractModule implements ModuleCustomIn
     public function title(): string
     {
         /* I18N: Name of a module/report */
-        return I18N::translate(ResearchTasksReportModule::REPORT_TITLE);
+        return self::displayTitle();
     }
 
     /**
@@ -652,9 +669,16 @@ JS,
      */
     public function customTranslations(string $language): array
     {
-        $file = $this->resourcesFolder() . 'lang' . DIRECTORY_SEPARATOR . $language . '.php';
+        $file         = $this->resourcesFolder() . 'lang' . DIRECTORY_SEPARATOR . $language . '.php';
+        $translations = file_exists($file) ? (new Translation($file))->asArray() : [];
 
-        return file_exists($file) ? (new Translation($file))->asArray() : [];
+        // The report title is the name of the module. Every place that translates it (title(), the report XML
+        // files, the parameters page, the report header...) gets the sorting prefix from here, in every language
+        // (also when the language has no translation of it and the English text is used).
+        $title = $translations[self::REPORT_TITLE] ?? self::REPORT_TITLE;
+        $translations[self::REPORT_TITLE] = self::TITLE_PREFIX . (is_string($title) ? $title : self::REPORT_TITLE);
+
+        return $translations;
     }
 
     /**

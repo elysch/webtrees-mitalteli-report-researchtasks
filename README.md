@@ -31,7 +31,7 @@ Unpack the zip file and place the mitalteli-report-researchtasks folder in the m
 Default values (administration)
 -------------------------------
 Administrators can define the values of the parameters page used when it is opened "fresh" (from the menu or a link):
-Control panel > Modules > Reports > Research tasks report > Preferences ("Default values").
+Control panel > Modules > Reports > ⛮ Research tasks report > Preferences ("Default values").
 - Reload and back/forward navigation keep what the visitor had selected; the defaults are not applied then.
 - The individual, the family and the dates are not configurable (they depend on each visit).
 - "Restore the original values" removes the saved defaults.
