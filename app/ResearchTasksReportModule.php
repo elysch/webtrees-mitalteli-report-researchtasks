@@ -48,7 +48,7 @@ class ResearchTasksReportModule extends AbstractModule implements ModuleCustomIn
     public ModuleService $module_service;
 
     public const CUSTOM_AUTHOR = 'elysch';
-    public const CUSTOM_VERSION = '3.4.5';
+    public const CUSTOM_VERSION = '3.4.6';
     public const GITHUB_REPO = 'webtrees-mitalteli-report-researchtasks';
     public const AUTHOR_WEBSITE = 'https://github.com/elysch/webtrees-mitalteli-report-researchtasks/';
     public const CUSTOM_SUPPORT_URL = self::AUTHOR_WEBSITE . 'issues';
@@ -57,7 +57,18 @@ class ResearchTasksReportModule extends AbstractModule implements ModuleCustomIn
      * The report title is the name of the module. Every place that translates it (title(), the report XML
      * files, the parameters page, the report header...) gets the sorting prefix from here, in every language
      * (also when the language has no translation of it and the English text is used). */
-    private const TITLE_PREFIX = "\u{26EE} "; # ⛮
+    public const TITLE_PREFIX_SYMBOL = "\u{26EE}"; # ⛮
+    public const TITLE_PREFIX = self::TITLE_PREFIX_SYMBOL . " "; # ⛮
+
+    /** The PDF font bundled with webtrees (DejaVu Sans) has no glyph for U+26EE (GEAR WITHOUT HUB): it is drawn as an
+     * empty box. In PDF output only, it is replaced by U+2699 (GEAR), which DejaVu Sans does have. HTML is not affected. */
+    private const PDF_TITLE_SYMBOL_SUBSTITUTE = ["\u{26EE}" => "\u{2699}"];
+
+    /** Text safe to be drawn with the PDF font bundled with webtrees (see PDF_TITLE_SYMBOL_SUBSTITUTE). */
+    public static function pdfSafeText(string $text): string
+    {
+        return $text === '' ? $text : strtr($text, self::PDF_TITLE_SYMBOL_SUBSTITUTE);
+    }
 
     /* The report title must be exactly the same as in resources/report.xml and resources/report-2.3.xml in two places each, at least*/
     public const REPORT_TITLE = 'Research tasks report';

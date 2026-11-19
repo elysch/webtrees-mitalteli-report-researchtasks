@@ -51,6 +51,26 @@ class MitalteliPdfRenderer_2_0 extends PdfRenderer
         #parent::{__FUNCTION__}();
     }    
 
+
+    /**
+     * A cell/box taller than a whole page can never fit in one: the core check (PdfRenderer::checkPageBreakPDF)
+     * adds a new page even when it is at the top of a page, which leaves the previous page almost empty (only the
+     * first cells of the row). For such a cell no page is added: the text flows over the pages by itself.
+     * Signature kept loose on purpose to be compatible with all webtrees 2.x versions.
+     */
+    public function checkPageBreakPDF($height): bool
+    {
+        if (isset($this->tcpdf) && ResearchTasksReportModule::isReportTitle($this->title)) {
+            $margins = $this->tcpdf->getMargins();
+            $usable  = $this->tcpdf->getPageHeight() - $margins['top'] - $margins['bottom'];
+            if ((float) $height >= $usable) {
+                return false;
+            }
+        }
+
+        return parent::checkPageBreakPDF($height);
+    }
+
     /** When true, all text output is replaced with random letters of same length. */
     public bool $debug_obfuscate = false;
 

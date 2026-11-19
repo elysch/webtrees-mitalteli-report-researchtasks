@@ -31,6 +31,54 @@ use vendor\WebtreesModules\mitalteli\ResearchTasksReportNamespace\Report\Mitalte
  */
 class MitalteliTcpdfWrapper extends TcpdfWrapper
 {
+
+
+    /** TCPDF font family of the one-glyph font (resources/fonts) that has the report-title symbol. */
+    private const SYMBOL_FONT = 'mitaltelipdfsymbol';
+
+    /** null: not tried yet; true: the symbol font is registered; false: not available (U+2699 is used instead). */
+    private ?bool $symbol_font = null;
+
+    private function symbolFontAvailable(): bool
+    {
+        if ($this->symbol_font === null) {
+            $this->symbol_font = false;
+            $file = dirname(__DIR__, 2) . '/resources/fonts/' . self::SYMBOL_FONT . '.php';
+            if (is_readable($file)) {
+                try {
+                    foreach (['', 'B', 'I', 'BI'] as $style) {
+                        $this->AddFont(self::SYMBOL_FONT, $style, $file);
+                    }
+                    $this->symbol_font = true;
+                } catch (\Throwable $e) {
+                    $this->symbol_font = false;
+                }
+            }
+        }
+
+        return $this->symbol_font;
+    }
+
+    /**
+     * Makes the report-title symbol drawable. The PDF font (DejaVu Sans) has no U+26EE: in HTML text the symbol is
+     * drawn with a one-glyph font that has it; if that is not possible, a similar symbol of DejaVu Sans is used.
+     */
+    private function drawableSymbols(string $text, bool $is_html): string
+    {
+        // TCPDF writes HTML text through Cell(): text already drawn with the symbol font must not be changed
+        if ($this->FontFamily === self::SYMBOL_FONT) {
+            return $text;
+        }
+        if ($text === '' || strpos($text, "\u{26EE}") === false || strpos($text, 'font-family:' . self::SYMBOL_FONT) !== false) {
+            return $text;
+        }
+        if ($is_html && $this->symbolFontAvailable()) {
+            return str_replace("\u{26EE}", '<span style="font-family:' . self::SYMBOL_FONT . '">' . "\u{26EE}" . '</span>', $text);
+        }
+
+        return ResearchTasksReportModule::pdfSafeText($text);
+    }
+
     private function site_info(): string
     {
         // Check if the report string contains the module directory path
@@ -127,6 +175,9 @@ class MitalteliTcpdfWrapper extends TcpdfWrapper
         $cell = false,
         $align = ''
     ): void {
+        if (is_string($html)) {
+            $html = $this->drawableSymbols($html, true);
+        }
         if ($this->debug_obfuscate && is_string($html)) {
             $html = $this->obf()->obfuscateHtml($html);
         }
@@ -163,6 +214,37 @@ class MitalteliTcpdfWrapper extends TcpdfWrapper
         $calign = 'T',
         $valign = 'M'
     ): void {
+        // Plain text cell that starts with the title symbol (TCPDF's own page header uses one for the title of the
+        // report): the symbol is drawn with its font in its own cell, followed by the rest of the text.
+        $prefix = "\u{26EE} ";
+        if (
+            is_string($txt)
+            && strncmp($txt, $prefix, strlen($prefix)) === 0
+            && ($align === '' || $align === 'L')
+            && !$this->rtl
+            && $this->FontFamily !== self::SYMBOL_FONT
+            && $this->symbolFontAvailable()
+        ) {
+            $family = $this->FontFamily;
+            $style  = $this->FontStyle;
+            $size   = $this->FontSizePt;
+            $this->setFont(self::SYMBOL_FONT, $style, $size);
+            $padding = $this->cell_padding['L'] + $this->cell_padding['R'];
+            $first_w = $this->GetStringWidth($prefix) + $padding;
+            $this->setFont($family, $style, $size);
+            if ($w <= 0 || $w > $first_w) {
+                $this->setFont(self::SYMBOL_FONT, $style, $size);
+                parent::Cell($first_w, $h, $prefix, 0, 0, 'L', $fill, '', 0, $ignore_min_height, $calign, $valign);
+                $this->setFont($family, $style, $size);
+                $this->Cell($w > 0 ? $w - $first_w : 0, $h, substr($txt, strlen($prefix)), $border, $ln, $align, $fill, $link, $stretch, $ignore_min_height, $calign, $valign);
+
+                return;
+            }
+        }
+
+        if (is_string($txt)) {
+            $txt = $this->drawableSymbols($txt, false);
+        }
         if ($this->debug_obfuscate) {
             // Link annotations carry the real site URL, tree name and XREF: drop them (fail closed).
             $link = '';
@@ -174,5 +256,94 @@ class MitalteliTcpdfWrapper extends TcpdfWrapper
             $ignore_min_height, $calign, $valign);
     }
 
+    /**
+     * Where the row of cells that is being drawn ends, when one of its cells is taller than a page and flowed over
+     * several pages: [page, y]. null when there is no such cell.
+     *
+     * @var array{0:int,1:float}|null
+     */
+    private ?array $tall_row_end = null;
 
+    /**
+     * Same as the parent, plus:
+     * - text is made safe for the PDF font (see ResearchTasksReportModule::pdfSafeText());
+     * - a cell that does not end in the page where it started (it is taller than the remaining space and flows over
+     *   the next pages) is a problem for the cells of the same row. For "newline = 0" cells TCPDF goes back to the
+     *   first page and the first Y, so the next row started there, over the text of the long cell. The end of the
+     *   long cell is remembered and the NEXT ROW starts there.
+     */
+    public function MultiCell(
+        $w,
+        $h,
+        $txt,
+        $border = 0,
+        $align = 'J',
+        $fill = false,
+        $ln = 1,
+        $x = null,
+        $y = null,
+        $reseth = true,
+        $stretch = 0,
+        $ishtml = false,
+        $autopadding = true,
+        $maxh = 0,
+        $valign = 'T',
+        $fitcell = false
+    ) {
+        // (HTML text is handled by writeHTML(), which TCPDF calls from here)
+        if (is_string($txt) && !$ishtml) {
+            $txt = $this->drawableSymbols($txt, false);
+        }
+
+        $start_page = $this->getPage();
+        $start_x    = ($x === null || $x === '') ? $this->GetX() : (float) $x;
+        $start_y    = ($y === null || $y === '') ? $this->GetY() : (float) $y;
+        $num_ln     = (int) $ln;
+
+        // Always let TCPDF finish "below" (ln = 1) to learn where the text ends; "ln = 0" is emulated afterwards.
+        $result = parent::MultiCell($w, $h, $txt, $border, $align, $fill, $num_ln > 0 ? $ln : 1, $x, $y, $reseth, $stretch, $ishtml, $autopadding, $maxh, $valign, $fitcell);
+
+        $end_page = $this->getPage();
+        $end_y    = $this->GetY();
+
+        if ($num_ln > 0) {
+            // Last cell of the row: the row ends where its longest cell ended.
+            if ($this->tall_row_end !== null) {
+                [$row_page, $row_y] = $this->tall_row_end;
+                $this->tall_row_end = null;
+                if ($row_page > $end_page || ($row_page === $end_page && $row_y > $end_y)) {
+                    $this->setPage($row_page);
+                    $this->SetY($row_y, false);
+                }
+            }
+            return $result;
+        }
+
+        // Emulate ln = 0: back to the beginning of the cell, to the right.
+        $this->setPage($start_page);
+        $this->SetY($start_y, false);
+        $this->SetX($start_x + (float) $w);
+
+        if ($end_page > $start_page) {
+            // Flowed over several pages: remember the end, for the next row.
+            if (
+                $this->tall_row_end === null
+                || $end_page > $this->tall_row_end[0]
+                || ($end_page === $this->tall_row_end[0] && $end_y > $this->tall_row_end[1])
+            ) {
+                $this->tall_row_end = [$end_page, $end_y];
+            }
+        }
+
+        return $result;
+    }
+
+    /**
+     * While a row has a cell that flowed over several pages, its last height is meaningless for the other cells of the
+     * row (they are on the first page): report 0 so they keep their own height.
+     */
+    public function getLastH()
+    {
+        return $this->tall_row_end !== null ? 0 : parent::getLastH();
+    }
 }

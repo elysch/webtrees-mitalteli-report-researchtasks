@@ -46,6 +46,7 @@ use Fisharebest\Webtrees\Enums\ImageOperation;
 use Fisharebest\Webtrees\MediaFile;
 use Fisharebest\Webtrees\Registry;
 use Fisharebest\Webtrees\Webtrees;
+use vendor\WebtreesModules\mitalteli\ResearchTasksReportNamespace\ResearchTasksReportModule;
 
 use Fisharebest\Webtrees\Report\AbstractRenderer;
 use Fisharebest\Webtrees\Report\Cell;
@@ -167,7 +168,7 @@ class MitalteliPdfRenderer_2_3 extends AbstractRenderer implements ElementFactor
             define('K_PATH_FONTS', $font_path);
         }
 
-        $tcpdf = new Tcpdf(
+        $this->tcpdf = $tcpdf = new Tcpdf(
             self::UNITS,
             self::UNICODE,
             $config->font_subsetting,
@@ -290,11 +291,13 @@ class MitalteliPdfRenderer_2_3 extends AbstractRenderer implements ElementFactor
 
     public function setTextColor(HexColor $color): void
     {
+        $this->text_color_hex = $color->hex();
         $this->adaptor->setTextColor($color);
     }
 
     public function resetColors(): void
     {
+        $this->text_color_hex = '#000000';
         $this->adaptor->resetColors();
     }
 
@@ -317,13 +320,85 @@ class MitalteliPdfRenderer_2_3 extends AbstractRenderer implements ElementFactor
         $this->adaptor->drawRect($x, $y, $width, $height, $style);
     }
 
+    /** The symbol of the report title, followed by the space that separates it from the title. */
+    /** Baseline of the text, in em from the top of the line (calibrated against DejaVu Sans, see tests). */
+    private const float SYMBOL_BASELINE = 0.93;
+
+    private const string SYMBOL_PREFIX = ResearchTasksReportModule::TITLE_PREFIX;
+
+    /** Advance width of the symbol, in em (1 = the font size). */
+    private const float SYMBOL_ADVANCE = 0.989;
+
+    /**
+     * Outline of U+26EE (GEAR WITHOUT HUB) in em units (y up, baseline at 0), from Noto Sans Symbols (SIL Open Font
+     * License 1.1, see resources/fonts/OFL-NotoSansSymbols.txt). Operators of a PDF path separated by "|":
+     * m = move, l = line, c = cubic curve, h = close.
+     *
+     * The PDF font bundled with webtrees (DejaVu Sans) has no glyph for it and tc-lib-pdf-font only loads fonts from the
+     * webtrees font directory, so the symbol is drawn as a vector shape: nothing has to be installed outside the module.
+     */
+    private const string SYMBOL_PATH = 'm 0.47 0|l 0.47 0.151|c 0.422 0.1563 0.381 0.1733 0.347 0.202|l 0.24 0.095|l 0.204 0.131|l 0.311 0.238|c 0.2823 0.2733 0.2653 0.3143 0.26 0.361|l 0.101 0.361|l 0.101 0.241|l 0.051 0.241|l 0.051 0.411|l 0.26 0.411|c 0.2653 0.457 0.2823 0.498 0.311 0.534|l 0.204 0.641|l 0.24 0.677|l 0.347 0.57|c 0.3803 0.5987 0.4213 0.6153 0.47 0.62|l 0.47 0.772|l 0.52 0.772|l 0.52 0.62|c 0.5667 0.6147 0.6077 0.598 0.643 0.57|l 0.75 0.677|l 0.786 0.641|l 0.679 0.534|c 0.707 0.5 0.7237 0.459 0.729 0.411|l 0.888 0.411|l 0.888 0.531|l 0.938 0.531|l 0.938 0.361|l 0.729 0.361|c 0.7243 0.3137 0.7077 0.2727 0.679 0.238|l 0.786 0.131|l 0.75 0.095|l 0.643 0.202|c 0.607 0.1733 0.566 0.1563 0.52 0.151|l 0.52 0|h|m 0.495 0.207|c 0.5277 0.207 0.5575 0.215 0.5845 0.231|c 0.6115 0.247 0.6332 0.2687 0.6495 0.296|c 0.6658 0.3233 0.674 0.3533 0.674 0.386|c 0.674 0.4193 0.6658 0.4495 0.6495 0.4765|c 0.6332 0.5035 0.6115 0.525 0.5845 0.541|c 0.5575 0.557 0.5277 0.565 0.495 0.565|c 0.4623 0.565 0.4325 0.5568 0.4055 0.5405|c 0.3785 0.5242 0.3568 0.5025 0.3405 0.4755|c 0.3242 0.4485 0.316 0.4187 0.316 0.386|c 0.316 0.3533 0.3242 0.3235 0.3405 0.2965|c 0.3568 0.2695 0.3785 0.2478 0.4055 0.2315|c 0.4325 0.2152 0.4623 0.207 0.495 0.207|h';
+
+    private Tcpdf $tcpdf;
+
+    private string $text_color_hex = '#000000';
+
+    /** Draws the symbol with its left edge at $x and its baseline at $baseline (user units, y down). */
+    private function drawSymbol(float $x, float $baseline, float $size): void
+    {
+        $out = 'q ' . $this->tcpdf->color->getPdfColor($this->text_color_hex, false);
+        foreach (explode('|', self::SYMBOL_PATH) as $segment) {
+            $parts = explode(' ', $segment);
+            $op    = array_shift($parts);
+            foreach ($parts as $i => $value) {
+                $em    = (float) $value;
+                $parts[$i] = $i % 2 === 0
+                    ? sprintf('%.3F', $this->tcpdf->toPoints($x) + $em * $this->tcpdf->toPoints($size))
+                    : sprintf('%.3F', $this->tcpdf->toYPoints($baseline) + $em * $this->tcpdf->toPoints($size));
+            }
+            $out .= implode(' ', $parts) . ($parts === [] ? '' : ' ') . $op . "\n";
+        }
+        $out .= "f\nQ\n";
+
+        $this->tcpdf->page->addContent($out);
+    }
+
     public function drawTextBlock(string $text, float $x, float $y, float $width, float $height, string $align, float $line_height, bool $with_padding = true): void
     {
+        $style = $this->currentStyleValue();
+
+        // The title of the report starts with a symbol that the PDF font does not have: it is drawn as a shape, just
+        // before the rest of the text. Only for left aligned text in left-to-right pages; in the other cases a similar
+        // symbol of the PDF font (U+2699) is used.
+        if (
+            $style instanceof Style
+            && !$this->is_rtl_page()
+            && ($align === 'L' || $align === '')
+            && str_starts_with($text, self::SYMBOL_PREFIX)
+        ) {
+            $pad    = $with_padding ? 1.0 : 0.0; // TcLibPdfAdaptor::CELL_PADDING
+            $offset = self::SYMBOL_ADVANCE * $style->size + $this->adaptor->getStringWidth(' ');
+            if ($width - $offset > 2 * $pad && $height >= $line_height) {
+                $this->drawSymbol($x + $pad, $y + $pad + self::SYMBOL_BASELINE * $style->size, $style->size);
+                $this->drawTextBlock(substr($text, strlen(self::SYMBOL_PREFIX)), $x + $offset, $y, $width - $offset, $height, $align, $line_height, $with_padding);
+
+                return;
+            }
+        }
+
+        // The PDF font has no glyph for the report-title symbol (U+26EE): use a similar one that it has.
+        $text = ResearchTasksReportModule::pdfSafeText($text);
+
         if ($this->debug_obfuscate) {
             $text = $this->obfuscateBlockText($text);
         }
 
         $this->adaptor->drawTextBlock($text, $x, $y, $width, $height, $align, $line_height, $with_padding);
+    }
+
+    private function is_rtl_page(): bool
+    {
+        return $this->adaptor->getRTL();
     }
 
     public function addLinkArea(float $x, float $y, float $width, float $height, string $url): void

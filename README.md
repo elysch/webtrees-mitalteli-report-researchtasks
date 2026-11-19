@@ -61,3 +61,16 @@ layout with width-preserving letters, external links and images are dropped. Lim
  [1]: https://github.com/elysch/webtrees-mitalteli-report-researchtasks/releases/latest
  [2]: https://webtrees.github.io/download
  [3]: https://github.com/elysch/webtrees-mitalteli-report-researchtasks/issues?state=open
+
+## PDF: symbol of the report title
+
+The PDF font bundled with webtrees (DejaVu Sans) has no glyph for the symbol of the title (U+26EE). The module draws the
+real symbol in PDF output, nothing has to be installed outside the module:
+
+- webtrees 2.0 - 2.2: with a one-glyph font (`resources/fonts/`) loaded by the module.
+- webtrees 2.3-dev: as a vector shape (the outline is in `MitalteliPdfRenderer_2_3`), because tc-lib-pdf-font only loads
+  fonts from webtrees' own font directory. It is a drawing: it is not part of the text of the PDF.
+
+The shape and the font come from Noto Sans Symbols (SIL Open Font License 1.1, see `resources/fonts/`). If the symbol
+cannot be drawn (for example right-to-left pages) the PDF shows U+2699 (gear), which DejaVu Sans has. HTML output is not
+affected.
